@@ -92,3 +92,6 @@ parser.add_argument("--adv-samplers", action="store_true", help='show the "sampl
 pkm = parser.add_mutually_exclusive_group()
 pkm.add_argument("--uv", action="store_true", help="Use the uv package manager")
 pkm.add_argument("--uv-symlink", action="store_true", help="Use the uv package manager with symlink")
+
+# backward compatibility
+parser.add_argument("--use-cpu", nargs="+", help="required by adetailer", default=[], type=str.lower)
