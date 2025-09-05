@@ -89,6 +89,15 @@ def run(command, desc=None, errdesc=None, custom_env=None, live: bool = default_
     return result.stdout or ""
 
 
+def _torch_version() -> str:
+    import importlib.metadata
+
+    ver = importlib.metadata.version("torch")
+    ver = ver.split("+", 1)[0]
+    assert len(ver.split(".")) == 3
+    return ver
+
+
 def is_installed(package):
     try:
         dist = importlib.metadata.distribution(package)
@@ -270,32 +279,10 @@ def requirements_met(requirements_file):
 
 
 def prepare_environment():
-    ver_TORCH = "2.8.0"
-
     torch_index_url = os.environ.get("TORCH_INDEX_URL", "https://download.pytorch.org/whl/cu128")
-    torch_command = os.environ.get("TORCH_COMMAND", f"pip install torch=={ver_TORCH}+cu128 torchvision==0.23.0+cu128 --extra-index-url {torch_index_url}")
+    torch_command = os.environ.get("TORCH_COMMAND", f"pip install torch==2.8.0+cu128 torchvision==0.23.0+cu128 --extra-index-url {torch_index_url}")
     xformers_package = os.environ.get("XFORMERS_PACKAGE", f"xformers==0.0.32.post1 --extra-index-url {torch_index_url}")
     sage_package = os.environ.get("SAGE_PACKAGE", "sageattention==1.0.6")
-
-    ver_PY = f"cp{sys.version_info.major}{sys.version_info.minor}"
-
-    if os.name == "nt":
-        ver_FLASH = "2.8.2"
-        ver_TRITON = "3.4.0.post20"
-        ver_NUNCHAKU = "0.3.2"
-
-        flash_package = os.environ.get("FLASH_PACKAGE", f"https://github.com/kingbri1/flash-attention/releases/download/v{ver_FLASH}/flash_attn-{ver_FLASH}+cu128torch{ver_TORCH}cxx11abiFALSE-{ver_PY}-{ver_PY}-win_amd64.whl")
-        triton_package = os.environ.get("TRITION_PACKAGE", f"triton-windows=={ver_TRITON}")
-        nunchaku_package = os.environ.get("NUNCHAKU_PACKAGE", f"https://github.com/nunchaku-tech/nunchaku/releases/download/v{ver_NUNCHAKU}/nunchaku-{ver_NUNCHAKU}+torch{ver_TORCH[:3]}-{ver_PY}-{ver_PY}-win_amd64.whl")
-
-    else:
-        ver_FLASH = "2.8.2"
-        ver_TRITON = "3.4.0"
-        ver_NUNCHAKU = "0.3.2"
-
-        flash_package = os.environ.get("FLASH_PACKAGE", f"https://github.com/Dao-AILab/flash-attention/releases/download/v{ver_FLASH}/flash_attn-{ver_FLASH}+cu12torch{ver_TORCH[:3]}cxx11abiFALSE-{ver_PY}-{ver_PY}-linux_x86_64.whl")
-        triton_package = os.environ.get("TRITION_PACKAGE", f"triton=={ver_TRITON}")
-        nunchaku_package = os.environ.get("NUNCHAKU_PACKAGE", f"https://github.com/nunchaku-tech/nunchaku/releases/download/v{ver_NUNCHAKU}/nunchaku-{ver_NUNCHAKU}+torch{ver_TORCH[:3]}-{ver_PY}-{ver_PY}-linux_x86_64.whl")
 
     clip_package = os.environ.get("CLIP_PACKAGE", "https://github.com/openai/CLIP/archive/d50d76daa670286dd6cacf3bcd80b5e4823fc8e1.zip")
     gradio_package = os.environ.get("GRADIO_PACKAGE", "gradio==4.40.0 gradio_imageslider==0.0.20 gradio_rangeslider==0.0.6")
@@ -327,6 +314,24 @@ def prepare_environment():
             raise RuntimeError("PyTorch is not able to access CUDA")
         startup_timer.record("torch GPU test")
 
+    ver_PY = f"cp{sys.version_info.major}{sys.version_info.minor}"
+    ver_FLASH = "2.8.2"
+    ver_TRITON = "3.4.0"
+    ver_NUNCHAKU = "1.0.0"
+    ver_TORCH = _torch_version()
+
+    if os.name == "nt":
+        ver_TRITON += ".post20"
+
+        flash_package = os.environ.get("FLASH_PACKAGE", f"https://github.com/kingbri1/flash-attention/releases/download/v{ver_FLASH}/flash_attn-{ver_FLASH}+cu128torch{ver_TORCH}cxx11abiFALSE-{ver_PY}-{ver_PY}-win_amd64.whl")
+        triton_package = os.environ.get("TRITION_PACKAGE", f"triton-windows=={ver_TRITON}")
+        nunchaku_package = os.environ.get("NUNCHAKU_PACKAGE", f"https://github.com/nunchaku-tech/nunchaku/releases/download/v{ver_NUNCHAKU}/nunchaku-{ver_NUNCHAKU}+torch{ver_TORCH[:3]}-{ver_PY}-{ver_PY}-win_amd64.whl")
+
+    else:
+        flash_package = os.environ.get("FLASH_PACKAGE", f"https://github.com/Dao-AILab/flash-attention/releases/download/v{ver_FLASH}/flash_attn-{ver_FLASH}+cu12torch{ver_TORCH[:3]}cxx11abiFALSE-{ver_PY}-{ver_PY}-linux_x86_64.whl")
+        triton_package = os.environ.get("TRITION_PACKAGE", f"triton=={ver_TRITON}")
+        nunchaku_package = os.environ.get("NUNCHAKU_PACKAGE", f"https://github.com/nunchaku-tech/nunchaku/releases/download/v{ver_NUNCHAKU}/nunchaku-{ver_NUNCHAKU}+torch{ver_TORCH[:3]}-{ver_PY}-{ver_PY}-linux_x86_64.whl")
+
     if not is_installed("clip"):
         run_pip(f"install {clip_package}", "clip")
         startup_timer.record("install clip")
@@ -351,7 +356,7 @@ def prepare_environment():
         else:
             startup_timer.record("install flash_attn")
 
-    if not is_installed("nunchaku"):
+    if not is_installed("nunchaku") or args.reinstall_nunchaku:
         try:
             run_pip(f"install {nunchaku_package}", "nunchaku")
         except RuntimeError:
