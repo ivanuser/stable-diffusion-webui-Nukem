@@ -29,6 +29,10 @@ The name "Forge" is inspired by "Minecraft Forge". This project aims to become t
 
 - [X] Support [Wan 2.2](https://github.com/Wan-Video/Wan2.2)
     - `txt2img`, `img2img`, `txt2vid`, `img2vid`
+
+> [!Important]
+> To export a video, you need to have **[FFmpeg](https://ffmpeg.org/)** installed
+
 - [X] Support [Nunchaku](https://github.com/nunchaku-tech/nunchaku) (`SVDQ`) Models
     - `dev`, `krea`, `kontext`, `t5`
 - [X] Support [Flux Kontext](https://huggingface.co/black-forest-labs/FLUX.1-Kontext-dev)
@@ -270,6 +274,21 @@ The name "Forge" is inspired by "Minecraft Forge". This project aims to become t
 ```bash
 set TORCH_COMMAND=pip install torch==2.1.2 torchvision==0.16.2 --extra-index-url https://download.pytorch.org/whl/cu121
 ```
+
+</details>
+
+### Install FFmpeg
+
+<details>
+<summary>Expand</summary>
+
+> for Windows
+
+1. Download the FFmpeg [.7z](https://www.gyan.dev/ffmpeg/builds/ffmpeg-git-essentials.7z)
+2. Extract the contents to a folder of choice
+3. Add the `bin` folder within to the system **PATH**
+    - `Edit the System Environment Variables` > `Environment Variables` > `Path`
+4. Verify the installation by entering `ffmpeg` in a command prompt
 
 </details>
 
