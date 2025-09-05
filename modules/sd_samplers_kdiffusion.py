@@ -1,55 +1,40 @@
-import torch
 import inspect
-import k_diffusion.sampling
-import k_diffusion.external
-from modules import sd_samplers_common, sd_samplers_extra, sd_samplers_cfg_denoiser, sd_schedulers, devices
-from modules.sd_samplers_cfg_denoiser import CFGDenoiser  # noqa: F401
-from modules.script_callbacks import ExtraNoiseParams, extra_noise_callback
 
-from modules.shared import opts
+import k_diffusion
+import torch
+
 import modules.shared as shared
-from backend.sampling.sampling_function import sampling_prepare, sampling_cleanup
-
+from backend.sampling.sampling_function import sampling_cleanup, sampling_prepare
+from modules import devices, sd_samplers_cfg_denoiser, sd_samplers_common, sd_samplers_extra, sd_schedulers
+from modules.script_callbacks import ExtraNoiseParams, extra_noise_callback
+from modules.sd_samplers_cfg_denoiser import CFGDenoiser  # noqa: F401
+from modules.shared import opts
 
 samplers_k_diffusion = [
-    ('DPM++ 2M', 'sample_dpmpp_2m', ['k_dpmpp_2m'], {'scheduler': 'karras'}),
-    ('DPM++ SDE', 'sample_dpmpp_sde', ['k_dpmpp_sde'], {'scheduler': 'karras', "second_order": True, "brownian_noise": True}),
-    ('DPM++ 2M SDE', 'sample_dpmpp_2m_sde', ['k_dpmpp_2m_sde'], {'scheduler': 'exponential', "brownian_noise": True}),
-    ('DPM++ 2M SDE Heun', 'sample_dpmpp_2m_sde', ['k_dpmpp_2m_sde_heun'], {'scheduler': 'exponential', "brownian_noise": True, "solver_type": "heun"}),
-    ('DPM++ 2S a', 'sample_dpmpp_2s_ancestral', ['k_dpmpp_2s_a'], {'scheduler': 'karras', "uses_ensd": True, "second_order": True}),
-    ('DPM++ 3M SDE', 'sample_dpmpp_3m_sde', ['k_dpmpp_3m_sde'], {'scheduler': 'exponential', 'discard_next_to_last_sigma': True, "brownian_noise": True}),
-    ('Euler a', 'sample_euler_ancestral', ['k_euler_a', 'k_euler_ancestral'], {"uses_ensd": True}),
-    ('Euler', 'sample_euler', ['k_euler'], {}),
-    ('LMS', 'sample_lms', ['k_lms'], {}),
-    ('Heun', 'sample_heun', ['k_heun'], {"second_order": True}),
-    ('DPM2', 'sample_dpm_2', ['k_dpm_2'], {'scheduler': 'karras', 'discard_next_to_last_sigma': True, "second_order": True}),
-    ('DPM2 a', 'sample_dpm_2_ancestral', ['k_dpm_2_a'], {'scheduler': 'karras', 'discard_next_to_last_sigma': True, "uses_ensd": True, "second_order": True}),
-    ('DPM fast', 'sample_dpm_fast', ['k_dpm_fast'], {"uses_ensd": True}),
-    ('DPM adaptive', 'sample_dpm_adaptive', ['k_dpm_ad'], {"uses_ensd": True}),
-    ('Restart', sd_samplers_extra.restart_sampler, ['restart'], {'scheduler': 'karras', "second_order": True}),
-    ('HeunPP2', 'sample_heunpp2', ['heunpp2'], {}),
-    ('IPNDM', 'sample_ipndm', ['ipndm'], {}),
-    ('IPNDM_V', 'sample_ipndm_v', ['ipndm_v'], {}),
-    ('DEIS', 'sample_deis', ['deis'], {}),
+    ("DPM++ 2M", "sample_dpmpp_2m", ["k_dpmpp_2m"], {"scheduler": "karras"}),
+    ("DPM++ SDE", "sample_dpmpp_sde", ["k_dpmpp_sde"], {"scheduler": "karras", "second_order": True, "brownian_noise": True}),
+    ("DPM++ 2M SDE", "sample_dpmpp_2m_sde", ["k_dpmpp_2m_sde_ka"], {"brownian_noise": True}),
+    ("DPM++ 3M SDE", "sample_dpmpp_3m_sde", ["k_dpmpp_3m_sde"], {"scheduler": "exponential", "discard_next_to_last_sigma": True, "brownian_noise": True}),
+    ("Euler a", "sample_euler_ancestral", ["k_euler_a", "k_euler_ancestral"], {"uses_ensd": True}),
+    ("Euler", "sample_euler", ["k_euler"], {}),
+    ("LMS", "sample_lms", ["k_lms"], {}),
+    ("Heun", "sample_heun", ["k_heun"], {"second_order": True}),
+    ("DPM2", "sample_dpm_2", ["k_dpm_2"], {"scheduler": "karras", "discard_next_to_last_sigma": True, "second_order": True}),
+    ("Restart", sd_samplers_extra.restart_sampler, ["restart"], {"scheduler": "karras", "second_order": True}),
+    ("DDPM", "sample_ddpm", ["ddpm"], {}),
 ]
 
 
-samplers_data_k_diffusion = [
-    sd_samplers_common.SamplerData(label, lambda model, funcname=funcname: KDiffusionSampler(funcname, model), aliases, options)
-    for label, funcname, aliases, options in samplers_k_diffusion
-    if callable(funcname) or hasattr(k_diffusion.sampling, funcname)
-]
+samplers_data_k_diffusion = [sd_samplers_common.SamplerData(label, lambda model, funcname=funcname: KDiffusionSampler(funcname, model), aliases, options) for label, funcname, aliases, options in samplers_k_diffusion if callable(funcname) or hasattr(k_diffusion.sampling, funcname)]
 
 sampler_extra_params = {
-    'sample_euler': ['s_churn', 's_tmin', 's_tmax', 's_noise'],
-    'sample_heun': ['s_churn', 's_tmin', 's_tmax', 's_noise'],
-    'sample_dpm_2': ['s_churn', 's_tmin', 's_tmax', 's_noise'],
-    'sample_dpm_fast': ['s_noise'],
-    'sample_dpm_2_ancestral': ['s_noise'],
-    'sample_dpmpp_2s_ancestral': ['s_noise'],
-    'sample_dpmpp_sde': ['s_noise'],
-    'sample_dpmpp_2m_sde': ['s_noise'],
-    'sample_dpmpp_3m_sde': ['s_noise'],
+    "sample_dpmpp_sde": ["eta", "s_noise", "r"],
+    "sample_dpmpp_2m_sde": ["eta", "s_noise"],
+    "sample_dpmpp_3m_sde": ["eta", "s_noise"],
+    "sample_euler_ancestral": ["eta", "s_noise"],
+    "sample_euler": ["s_churn", "s_tmin", "s_tmax", "s_noise"],
+    "sample_heun": ["s_churn", "s_tmin", "s_tmax", "s_noise"],
+    "sample_dpm_2": ["s_churn", "s_tmin", "s_tmax", "s_noise"],
 }
 
 k_diffusion_samplers_map = {x.name: x for x in samplers_data_k_diffusion}
@@ -79,16 +64,16 @@ class KDiffusionSampler(sd_samplers_common.Sampler):
         self.model_wrap = self.model_wrap_cfg.inner_model
 
     def get_sigmas(self, p, steps):
-        discard_next_to_last_sigma = self.config is not None and self.config.options.get('discard_next_to_last_sigma', False)
+        discard_next_to_last_sigma = self.config is not None and self.config.options.get("discard_next_to_last_sigma", False)
         if opts.always_discard_next_to_last_sigma and not discard_next_to_last_sigma:
             discard_next_to_last_sigma = True
             p.extra_generation_params["Discard penultimate sigma"] = True
 
         steps += 1 if discard_next_to_last_sigma else 0
 
-        scheduler_name = (p.hr_scheduler if p.is_hr_pass else p.scheduler) or 'Automatic'
-        if scheduler_name == 'Automatic':
-            scheduler_name = self.config.options.get('scheduler', None)
+        scheduler_name = (p.hr_scheduler if p.is_hr_pass else p.scheduler) or "Automatic"
+        if scheduler_name == "Automatic":
+            scheduler_name = self.config.options.get("scheduler", None)
 
         scheduler = sd_schedulers.schedulers_map.get(scheduler_name)
 
@@ -100,29 +85,28 @@ class KDiffusionSampler(sd_samplers_common.Sampler):
         elif scheduler is None or scheduler.function is None:
             sigmas = self.model_wrap.get_sigmas(steps)
         else:
-            sigmas_kwargs = {'sigma_min': sigma_min, 'sigma_max': sigma_max}
+            sigmas_kwargs = {"sigma_min": sigma_min, "sigma_max": sigma_max}
 
-            if scheduler.label != 'Automatic' and not p.is_hr_pass:
+            if scheduler.label != "Automatic" and not p.is_hr_pass:
                 p.extra_generation_params["Schedule type"] = scheduler.label
             elif scheduler.label != p.extra_generation_params.get("Schedule type"):
                 p.extra_generation_params["Hires schedule type"] = scheduler.label
 
             if opts.sigma_min != 0 and opts.sigma_min != m_sigma_min:
-                sigmas_kwargs['sigma_min'] = opts.sigma_min
+                sigmas_kwargs["sigma_min"] = opts.sigma_min
                 p.extra_generation_params["Schedule min sigma"] = opts.sigma_min
-
             if opts.sigma_max != 0 and opts.sigma_max != m_sigma_max:
-                sigmas_kwargs['sigma_max'] = opts.sigma_max
+                sigmas_kwargs["sigma_max"] = opts.sigma_max
                 p.extra_generation_params["Schedule max sigma"] = opts.sigma_max
 
             if scheduler.default_rho != -1 and opts.rho != 0 and opts.rho != scheduler.default_rho:
-                sigmas_kwargs['rho'] = opts.rho
+                sigmas_kwargs["rho"] = opts.rho
                 p.extra_generation_params["Schedule rho"] = opts.rho
 
             if scheduler.need_inner_model:
-                sigmas_kwargs['inner_model'] = self.model_wrap
+                sigmas_kwargs["inner_model"] = self.model_wrap
 
-            if scheduler.label == 'Beta':
+            if scheduler.label == "Beta":
                 p.extra_generation_params["Beta schedule alpha"] = opts.beta_dist_alpha
                 p.extra_generation_params["Beta schedule beta"] = opts.beta_dist_beta
 
@@ -140,7 +124,7 @@ class KDiffusionSampler(sd_samplers_common.Sampler):
         steps, t_enc = sd_samplers_common.setup_img2img_steps(p, steps)
 
         sigmas = self.get_sigmas(p, steps).to(x.device)
-        sigma_sched = sigmas[steps - t_enc - 1:]
+        sigma_sched = sigmas[steps - t_enc - 1 :]
 
         x = x.to(noise)
 
@@ -156,36 +140,39 @@ class KDiffusionSampler(sd_samplers_common.Sampler):
         extra_params_kwargs = self.initialize(p)
         parameters = inspect.signature(self.func).parameters
 
-        if 'sigma_min' in parameters:
+        if "sigma_min" in parameters:
             ## last sigma is zero which isn't allowed by DPM Fast & Adaptive so taking value before last
-            extra_params_kwargs['sigma_min'] = sigma_sched[-2]
-        if 'sigma_max' in parameters:
-            extra_params_kwargs['sigma_max'] = sigma_sched[0]
-        if 'n' in parameters:
-            extra_params_kwargs['n'] = len(sigma_sched) - 1
-        if 'sigma_sched' in parameters:
-            extra_params_kwargs['sigma_sched'] = sigma_sched
-        if 'sigmas' in parameters:
-            extra_params_kwargs['sigmas'] = sigma_sched
+            extra_params_kwargs["sigma_min"] = sigma_sched[-2]
+        if "sigma_max" in parameters:
+            extra_params_kwargs["sigma_max"] = sigma_sched[0]
+        if "n" in parameters:
+            extra_params_kwargs["n"] = len(sigma_sched) - 1
+        if "sigma_sched" in parameters:
+            extra_params_kwargs["sigma_sched"] = sigma_sched
+        if "sigmas" in parameters:
+            extra_params_kwargs["sigmas"] = sigma_sched
 
-        if self.config.options.get('brownian_noise', False):
+        if self.config.options.get("brownian_noise", False):
             noise_sampler = self.create_noise_sampler(x, sigmas, p)
-            extra_params_kwargs['noise_sampler'] = noise_sampler
+            extra_params_kwargs["noise_sampler"] = noise_sampler
 
-        if self.config.options.get('solver_type', None) == 'heun':
-            extra_params_kwargs['solver_type'] = 'heun'
+        if self.config.options.get("solver_type", None) == "heun":
+            extra_params_kwargs["solver_type"] = "heun"
 
         self.model_wrap_cfg.init_latent = x
         self.last_latent = x
         self.sampler_extra_args = {
-            'cond': conditioning,
-            'image_cond': image_conditioning,
-            'uncond': unconditional_conditioning,
-            'cond_scale': p.cfg_scale,
-            's_min_uncond': self.s_min_uncond
+            "cond": conditioning,
+            "image_cond": image_conditioning,
+            "uncond": unconditional_conditioning,
+            "cond_scale": p.cfg_scale,
+            "s_min_uncond": self.s_min_uncond,
         }
 
-        samples = self.launch_sampling(t_enc + 1, lambda: self.func(self.model_wrap_cfg, xi, extra_args=self.sampler_extra_args, disable=False, callback=self.callback_state, **extra_params_kwargs))
+        samples = self.launch_sampling(
+            t_enc + 1,
+            lambda: self.func(self.model_wrap_cfg, xi, extra_args=self.sampler_extra_args, disable=False, callback=self.callback_state, **extra_params_kwargs),
+        )
 
         self.add_infotext(p)
 
@@ -209,38 +196,39 @@ class KDiffusionSampler(sd_samplers_common.Sampler):
         extra_params_kwargs = self.initialize(p)
         parameters = inspect.signature(self.func).parameters
 
-        if 'n' in parameters:
-            extra_params_kwargs['n'] = steps
+        if "n" in parameters:
+            extra_params_kwargs["n"] = steps
 
-        if 'sigma_min' in parameters:
-            extra_params_kwargs['sigma_min'] = self.model_wrap.sigmas[0].item()
-            extra_params_kwargs['sigma_max'] = self.model_wrap.sigmas[-1].item()
+        if "sigma_min" in parameters:
+            extra_params_kwargs["sigma_min"] = self.model_wrap.sigmas[0].item()
+            extra_params_kwargs["sigma_max"] = self.model_wrap.sigmas[-1].item()
 
-        if 'sigmas' in parameters:
-            extra_params_kwargs['sigmas'] = sigmas
+        if "sigmas" in parameters:
+            extra_params_kwargs["sigmas"] = sigmas
 
-        if self.config.options.get('brownian_noise', False):
+        if self.config.options.get("brownian_noise", False):
             noise_sampler = self.create_noise_sampler(x, sigmas, p)
-            extra_params_kwargs['noise_sampler'] = noise_sampler
+            extra_params_kwargs["noise_sampler"] = noise_sampler
 
-        if self.config.options.get('solver_type', None) == 'heun':
-            extra_params_kwargs['solver_type'] = 'heun'
+        if self.config.options.get("solver_type", None) == "heun":
+            extra_params_kwargs["solver_type"] = "heun"
 
         self.last_latent = x
         self.sampler_extra_args = {
-            'cond': conditioning,
-            'image_cond': image_conditioning,
-            'uncond': unconditional_conditioning,
-            'cond_scale': p.cfg_scale,
-            's_min_uncond': self.s_min_uncond
+            "cond": conditioning,
+            "image_cond": image_conditioning,
+            "uncond": unconditional_conditioning,
+            "cond_scale": p.cfg_scale,
+            "s_min_uncond": self.s_min_uncond,
         }
 
-        samples = self.launch_sampling(steps, lambda: self.func(self.model_wrap_cfg, x, extra_args=self.sampler_extra_args, disable=False, callback=self.callback_state, **extra_params_kwargs))
+        samples = self.launch_sampling(
+            steps,
+            lambda: self.func(self.model_wrap_cfg, x, extra_args=self.sampler_extra_args, disable=False, callback=self.callback_state, **extra_params_kwargs),
+        )
 
         self.add_infotext(p)
 
         sampling_cleanup(unet_patcher)
 
         return samples
-
-

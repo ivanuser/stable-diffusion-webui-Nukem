@@ -1,12 +1,10 @@
 import torch
-from modules import prompt_parser, sd_samplers_common
 
-from modules.shared import opts, state
 import modules.shared as shared
-from modules.script_callbacks import CFGDenoiserParams, cfg_denoiser_callback
-from modules.script_callbacks import CFGDenoisedParams, cfg_denoised_callback
-from modules.script_callbacks import AfterCFGCallbackParams, cfg_after_cfg_callback
 from backend.sampling.sampling_function import sampling_function
+from modules import prompt_parser, sd_samplers_common
+from modules.script_callbacks import AfterCFGCallbackParams, CFGDenoisedParams, CFGDenoiserParams, cfg_after_cfg_callback, cfg_denoised_callback, cfg_denoiser_callback
+from modules.shared import opts, state
 
 
 def catenate_conds(conds):
@@ -27,7 +25,7 @@ def pad_cond(tensor, repeats, empty):
     if not isinstance(tensor, dict):
         return torch.cat([tensor, empty.repeat((tensor.shape[0], repeats, 1))], axis=1)
 
-    tensor['crossattn'] = pad_cond(tensor['crossattn'], repeats, empty)
+    tensor["crossattn"] = pad_cond(tensor["crossattn"], repeats, empty)
     return tensor
 
 
@@ -72,7 +70,7 @@ class CFGDenoiser(torch.nn.Module):
         raise NotImplementedError()
 
     def combine_denoised(self, x_out, conds_list, uncond, cond_scale, timestep, x_in, cond):
-        denoised_uncond = x_out[-uncond.shape[0]:]
+        denoised_uncond = x_out[-uncond.shape[0] :]
         denoised = torch.clone(denoised_uncond)
 
         for i, conds in enumerate(conds_list):
@@ -94,8 +92,8 @@ class CFGDenoiser(torch.nn.Module):
         self.model_wrap = None
 
         c, uc = self.p.get_conds()
-        self.sampler.sampler_extra_args['cond'] = c
-        self.sampler.sampler_extra_args['uncond'] = uc
+        self.sampler.sampler_extra_args["cond"] = c
+        self.sampler.sampler_extra_args["uncond"] = uc
 
     def pad_cond_uncond(self, cond, uncond):
         empty = shared.sd_model.cond_stage_model_empty_prompt
@@ -135,7 +133,7 @@ class CFGDenoiser(torch.nn.Module):
         """
 
         is_dict_cond = isinstance(uncond, dict)
-        uncond_vec = uncond['crossattn'] if is_dict_cond else uncond
+        uncond_vec = uncond["crossattn"] if is_dict_cond else uncond
 
         if uncond_vec.shape[1] < cond.shape[1]:
             last_vector = uncond_vec[:, -1:]
@@ -143,17 +141,17 @@ class CFGDenoiser(torch.nn.Module):
             uncond_vec = torch.hstack([uncond_vec, last_vector_repeated])
             self.padded_cond_uncond_v0 = True
         elif uncond_vec.shape[1] > cond.shape[1]:
-            uncond_vec = uncond_vec[:, :cond.shape[1]]
+            uncond_vec = uncond_vec[:, : cond.shape[1]]
             self.padded_cond_uncond_v0 = True
 
         if is_dict_cond:
-            uncond['crossattn'] = uncond_vec
+            uncond["crossattn"] = uncond_vec
         else:
             uncond = uncond_vec
 
         return cond, uncond
 
-    def forward(self, x, sigma, uncond, cond, cond_scale, s_min_uncond, image_cond):
+    def forward(self, x, sigma, uncond, cond, cond_scale, s_min_uncond, image_cond, **kwargs):
         if state.interrupted or state.skipped:
             raise sd_samplers_common.InterruptedException
 
@@ -165,12 +163,12 @@ class CFGDenoiser(torch.nn.Module):
             fake_sigmas = ((1 - acd) / acd) ** 0.5
             real_sigma = fake_sigmas[sigma.round().long().clip(0, int(fake_sigmas.shape[0]))]
             real_sigma_data = 1.0
-            x = x * (((real_sigma ** 2.0 + real_sigma_data ** 2.0) ** 0.5)[:, None, None, None])
+            x = x * (((real_sigma**2.0 + real_sigma_data**2.0) ** 0.5)[:, None, None, None])
             sigma = real_sigma
 
         if sd_samplers_common.apply_refiner(self, x):
-            cond = self.sampler.sampler_extra_args['cond']
-            uncond = self.sampler.sampler_extra_args['uncond']
+            cond = self.sampler.sampler_extra_args["cond"]
+            uncond = self.sampler.sampler_extra_args["uncond"]
 
         cond_composition, cond = prompt_parser.reconstruct_multicond_batch(cond, self.step)
         uncond = prompt_parser.reconstruct_cond_batch(uncond, self.step) if uncond is not None else None
@@ -186,7 +184,7 @@ class CFGDenoiser(torch.nn.Module):
         # NGMS
         if self.p.is_hr_pass == True:
             cond_scale = self.p.hr_cfg
-        
+
         if shared.opts.skip_early_cond > 0 and self.step / self.total_steps <= shared.opts.skip_early_cond:
             cond_scale = 1.0
             self.p.extra_generation_params["Skip Early CFG"] = shared.opts.skip_early_cond
@@ -206,6 +204,7 @@ class CFGDenoiser(torch.nn.Module):
 
             if self.p.scripts is not None:
                 from modules import scripts
+
                 mba = scripts.MaskBlendArgs(denoised, self.nmask, self.init_latent, self.mask, blended_latent, denoiser=self, sigma=sigma)
                 self.p.scripts.on_mask_blend(self.p, mba)
                 blended_latent = mba.blended_latent

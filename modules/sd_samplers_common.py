@@ -1,16 +1,17 @@
 import inspect
 from collections import namedtuple
+
+import k_diffusion.sampling
 import numpy as np
 import torch
 from PIL import Image
-from modules import devices, images, sd_vae_approx, sd_samplers, sd_vae_taesd, shared, sd_models
+
+from backend.sampling.sampling_function import sampling_cleanup, sampling_prepare
+from modules import devices, extra_networks, images, sd_models, sd_samplers, sd_vae_approx, sd_vae_taesd, shared
 from modules.shared import opts, state
-from backend.sampling.sampling_function import sampling_prepare, sampling_cleanup
-from modules import extra_networks
-import k_diffusion.sampling
 from modules_forge import main_entry
 
-SamplerDataTuple = namedtuple('SamplerData', ['name', 'constructor', 'aliases', 'options'])
+SamplerDataTuple = namedtuple("SamplerData", ["name", "constructor", "aliases", "options"])
 
 
 class SamplerData(SamplerDataTuple):
@@ -23,7 +24,7 @@ class SamplerData(SamplerDataTuple):
 
 def setup_img2img_steps(p, steps=None):
     if opts.img2img_fix_steps or steps is not None:
-        requested_steps = (steps or p.steps)
+        requested_steps = steps or p.steps
         steps = int(requested_steps / min(p.denoising_strength, 0.999)) if p.denoising_strength > 0 else 0
         t_enc = requested_steps - 1
     else:
@@ -68,9 +69,9 @@ def single_sample_to_image(sample, approximation=None):
     x_sample = samples_to_images_tensor(sample.unsqueeze(0), approximation)[0] * 0.5 + 0.5
 
     x_sample = x_sample.cpu()
-    x_sample.clamp_(0.0, 1.0)
-    x_sample.mul_(255.)
+    x_sample.mul_(255.0)
     x_sample.round_()
+    x_sample.clamp_(0.0, 255.0)
     x_sample = x_sample.to(torch.uint8)
     x_sample = np.moveaxis(x_sample.numpy(), 0, 2)
 
@@ -91,7 +92,7 @@ def samples_to_image_grid(samples, approximation=None):
 
 
 def images_tensor_to_samples(image, approximation=None, model=None):
-    '''image[0, 1] -> latent'''
+    """image[0, 1] -> latent"""
     if approximation is None:
         approximation = approximation_indexes.get(opts.sd_vae_encode_method, 0)
 
@@ -105,12 +106,7 @@ def images_tensor_to_samples(image, approximation=None, model=None):
         image = image.to(shared.device, dtype=devices.dtype_vae)
         image = image * 2 - 1
         if len(image) > 1 and not model.is_wan:
-            x_latent = torch.stack([
-                model.get_first_stage_encoding(
-                    model.encode_first_stage(torch.unsqueeze(img, 0))
-                )[0]
-                for img in image
-            ])
+            x_latent = torch.stack([model.get_first_stage_encoding(model.encode_first_stage(torch.unsqueeze(img, 0)))[0] for img in image])
         else:
             x_latent = model.get_first_stage_encoding(model.encode_first_stage(image))
 
@@ -181,15 +177,15 @@ def apply_refiner(cfg_denoiser, x):
             return False
 
         if opts.hires_fix_refiner_pass != "second pass":
-            cfg_denoiser.p.extra_generation_params['Hires refiner'] = opts.hires_fix_refiner_pass
+            cfg_denoiser.p.extra_generation_params["Hires refiner"] = opts.hires_fix_refiner_pass
 
-    cfg_denoiser.p.extra_generation_params['Refiner'] = refiner_checkpoint_info.short_title
-    cfg_denoiser.p.extra_generation_params['Refiner switch at'] = refiner_switch_at
+    cfg_denoiser.p.extra_generation_params["Refiner"] = refiner_checkpoint_info.short_title
+    cfg_denoiser.p.extra_generation_params["Refiner switch at"] = refiner_switch_at
 
     sampling_cleanup(sd_models.model_data.get_sd_model().forge_objects.unet)
 
     with sd_models.SkipWritingToConfig():
-        fp_checkpoint = getattr(shared.opts, 'sd_model_checkpoint')
+        fp_checkpoint = getattr(shared.opts, "sd_model_checkpoint")
         checkpoint_changed = main_entry.checkpoint_change(refiner_checkpoint_info.short_title, preset=None, save=False, refresh=False)
         if checkpoint_changed:
             try:
@@ -220,7 +216,7 @@ class TorchHijack:
         self.rng = p.rng
 
     def __getattr__(self, item):
-        if item == 'randn_like':
+        if item == "randn_like":
             return self.randn_like
 
         if hasattr(torch, item):
@@ -245,14 +241,14 @@ class Sampler:
         self.s_min_uncond = None
         self.s_churn = 0.0
         self.s_tmin = 0.0
-        self.s_tmax = float('inf')
+        self.s_tmax = float("inf")
         self.s_noise = 1.0
 
-        self.eta_option_field = 'eta_ancestral'
-        self.eta_infotext_field = 'Eta'
+        self.eta_option_field = "eta_ancestral"
+        self.eta_infotext_field = "Eta"
         self.eta_default = 1.0
 
-        self.conditioning_key = 'crossattn'
+        self.conditioning_key = "crossattn"
 
         self.p = None
         self.model_wrap_cfg = None
@@ -260,7 +256,7 @@ class Sampler:
         self.options = {}
 
     def callback_state(self, d):
-        step = d['i']
+        step = d["i"]
 
         if self.stop_at is not None and step > self.stop_at:
             raise InterruptedException
@@ -277,11 +273,7 @@ class Sampler:
         try:
             return func()
         except RecursionError:
-            print(
-                'Encountered RecursionError during sampling, returning last latent. '
-                'rho >5 with a polyexponential scheduler may cause this error. '
-                'You should try to use a smaller rho value instead.'
-            )
+            print("Encountered RecursionError during sampling; try to use a smaller rho value instead")
             return self.last_latent
         except InterruptedException:
             return self.last_latent
@@ -292,12 +284,12 @@ class Sampler:
     def initialize(self, p) -> dict:
         self.p = p
         self.model_wrap_cfg.p = p
-        self.model_wrap_cfg.mask = p.mask if hasattr(p, 'mask') else None
-        self.model_wrap_cfg.nmask = p.nmask if hasattr(p, 'nmask') else None
+        self.model_wrap_cfg.mask = p.mask if hasattr(p, "mask") else None
+        self.model_wrap_cfg.nmask = p.nmask if hasattr(p, "nmask") else None
         self.model_wrap_cfg.step = 0
-        self.model_wrap_cfg.image_cfg_scale = getattr(p, 'image_cfg_scale', None)
+        self.model_wrap_cfg.image_cfg_scale = getattr(p, "image_cfg_scale", None)
         self.eta = p.eta if p.eta is not None else getattr(opts, self.eta_option_field, 0.0)
-        self.s_min_uncond = getattr(p, 's_min_uncond', 0.0)
+        self.s_min_uncond = getattr(p, "s_min_uncond", 0.0)
 
         k_diffusion.sampling.torch = TorchHijack(p)
 
@@ -306,34 +298,34 @@ class Sampler:
             if hasattr(p, param_name) and param_name in inspect.signature(self.func).parameters:
                 extra_params_kwargs[param_name] = getattr(p, param_name)
 
-        if 'eta' in inspect.signature(self.func).parameters:
+        if "eta" in inspect.signature(self.func).parameters:
             if self.eta != self.eta_default:
                 p.extra_generation_params[self.eta_infotext_field] = self.eta
 
-            extra_params_kwargs['eta'] = self.eta
+            extra_params_kwargs["eta"] = self.eta
 
         if len(self.extra_params) > 0:
-            s_churn = getattr(opts, 's_churn', p.s_churn)
-            s_tmin = getattr(opts, 's_tmin', p.s_tmin)
-            s_tmax = getattr(opts, 's_tmax', p.s_tmax) or self.s_tmax # 0 = inf
-            s_noise = getattr(opts, 's_noise', p.s_noise)
+            s_churn = getattr(opts, "s_churn", p.s_churn)
+            s_tmin = getattr(opts, "s_tmin", p.s_tmin)
+            s_tmax = getattr(opts, "s_tmax", p.s_tmax) or self.s_tmax  # 0 = inf
+            s_noise = getattr(opts, "s_noise", p.s_noise)
 
-            if 's_churn' in extra_params_kwargs and s_churn != self.s_churn:
-                extra_params_kwargs['s_churn'] = s_churn
+            if "s_churn" in extra_params_kwargs and s_churn != self.s_churn:
+                extra_params_kwargs["s_churn"] = s_churn
                 p.s_churn = s_churn
-                p.extra_generation_params['Sigma churn'] = s_churn
-            if 's_tmin' in extra_params_kwargs and s_tmin != self.s_tmin:
-                extra_params_kwargs['s_tmin'] = s_tmin
+                p.extra_generation_params["Sigma churn"] = s_churn
+            if "s_tmin" in extra_params_kwargs and s_tmin != self.s_tmin:
+                extra_params_kwargs["s_tmin"] = s_tmin
                 p.s_tmin = s_tmin
-                p.extra_generation_params['Sigma tmin'] = s_tmin
-            if 's_tmax' in extra_params_kwargs and s_tmax != self.s_tmax:
-                extra_params_kwargs['s_tmax'] = s_tmax
+                p.extra_generation_params["Sigma tmin"] = s_tmin
+            if "s_tmax" in extra_params_kwargs and s_tmax != self.s_tmax:
+                extra_params_kwargs["s_tmax"] = s_tmax
                 p.s_tmax = s_tmax
-                p.extra_generation_params['Sigma tmax'] = s_tmax
-            if 's_noise' in extra_params_kwargs and s_noise != self.s_noise:
-                extra_params_kwargs['s_noise'] = s_noise
+                p.extra_generation_params["Sigma tmax"] = s_tmax
+            if "s_noise" in extra_params_kwargs and s_noise != self.s_noise:
+                extra_params_kwargs["s_noise"] = s_noise
                 p.s_noise = s_noise
-                p.extra_generation_params['Sigma noise'] = s_noise
+                p.extra_generation_params["Sigma noise"] = s_noise
 
         return extra_params_kwargs
 
@@ -343,8 +335,9 @@ class Sampler:
             return None
 
         from k_diffusion.sampling import BrownianTreeNoiseSampler
+
         sigma_min, sigma_max = sigmas[sigmas > 0].min(), sigmas.max()
-        current_iter_seeds = p.all_seeds[p.iteration * p.batch_size:(p.iteration + 1) * p.batch_size]
+        current_iter_seeds = p.all_seeds[p.iteration * p.batch_size : (p.iteration + 1) * p.batch_size]
         return BrownianTreeNoiseSampler(x, sigma_min, sigma_max, seed=current_iter_seeds)
 
     def sample(self, p, x, conditioning, unconditional_conditioning, steps=None, image_conditioning=None):
