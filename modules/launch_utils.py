@@ -282,7 +282,7 @@ def prepare_environment():
     if os.name == "nt":
         ver_FLASH = "2.8.2"
         ver_TRITON = "3.4.0.post20"
-        ver_NUNCHAKU = "1.0.0"
+        ver_NUNCHAKU = "0.3.2"
 
         flash_package = os.environ.get("FLASH_PACKAGE", f"https://github.com/kingbri1/flash-attention/releases/download/v{ver_FLASH}/flash_attn-{ver_FLASH}+cu128torch{ver_TORCH}cxx11abiFALSE-{ver_PY}-{ver_PY}-win_amd64.whl")
         triton_package = os.environ.get("TRITION_PACKAGE", f"triton-windows=={ver_TRITON}")
