@@ -10,7 +10,7 @@ import torch.nn as nn
 from einops import rearrange
 from nunchaku import NunchakuFluxTransformer2dModel, NunchakuT5EncoderModel
 from nunchaku.caching.diffusers_adapters.flux import apply_cache_on_transformer
-from nunchaku.caching.utils import cache_context, create_cache_context
+from nunchaku.caching.fbcache import cache_context, create_cache_context
 from nunchaku.lora.flux.compose import compose_lora
 from nunchaku.utils import load_state_dict_in_safetensors
 
@@ -19,7 +19,7 @@ from modules import shared
 
 
 class SVDQFluxTransformer2DModel(nn.Module):
-    """https://github.com/nunchaku-tech/ComfyUI-nunchaku/blob/v0.3.3/wrappers/flux.py"""
+    """https://github.com/nunchaku-tech/ComfyUI-nunchaku/blob/v1.0.0/wrappers/flux.py"""
 
     def __init__(self, config: dict):
         super().__init__()
@@ -114,7 +114,7 @@ class SVDQFluxTransformer2DModel(nn.Module):
         controlnet_block_samples = None if control is None else [y.to(x.dtype) for y in control["input"]]
         controlnet_single_block_samples = None if control is None else [y.to(x.dtype) for y in control["output"]]
 
-        if getattr(model, "_is_cached", False):
+        if getattr(model, "_is_cached", False) or getattr(model, "residual_diff_threshold_multi", 0) != 0:
             # A more robust caching strategy
             cache_invalid = False
 
@@ -187,7 +187,7 @@ class WrappedEmbedding(nn.Module):
 
 
 class SVDQT5(torch.nn.Module):
-    """https://github.com/nunchaku-tech/ComfyUI-nunchaku/blob/v0.3.3/nodes/models/text_encoder.py"""
+    """https://github.com/nunchaku-tech/ComfyUI-nunchaku/blob/v1.0.0/nodes/models/text_encoder.py"""
 
     def __init__(self, path: str):
         super().__init__()
