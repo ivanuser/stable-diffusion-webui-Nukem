@@ -50,7 +50,7 @@ def get_xformers_flash_attention_op(q, k, v):
         if fw.supports(xformers.ops.fmha.Inputs(query=q, key=k, value=v, attn_bias=None)):
             return flash_attention_op
     except Exception as e:
-        display_once(e, "enabling flash attention")
+        display_once(e, "get_xformers_flash_attention_op")
 
     return None
 
@@ -250,7 +250,7 @@ def attention_xformers(q, k, v, heads, mask=None, attn_precision=None, skip_resh
         mask_out[:, :, : mask.shape[-1]] = mask
         mask = mask_out[:, :, : mask.shape[-1]]
 
-    out = xformers.ops.memory_efficient_attention(q, k, v, attn_bias=mask, op=get_xformers_flash_attention_op(q, k, v))
+    out = xformers.ops.memory_efficient_attention(q, k, v, attn_bias=mask)
 
     if skip_reshape:
         out = out.unsqueeze(0).reshape(b, heads, -1, dim_head).permute(0, 2, 1, 3).reshape(b, -1, heads * dim_head)
@@ -308,7 +308,7 @@ def attention_sage(q, k, v, heads, mask=None, attn_precision=None, skip_reshape=
     try:
         out = sageattn(q, k, v, attn_mask=mask, is_causal=False, tensor_layout=tensor_layout)
     except Exception as e:
-        display_once(e)
+        display_once(e, "attention_sage")
         if tensor_layout == "NHD":
             q, k, v = map(
                 lambda t: t.transpose(1, 2),
@@ -356,7 +356,7 @@ def attention_flash(q, k, v, heads, mask=None, attn_precision=None, skip_reshape
             causal=False,
         ).transpose(1, 2)
     except Exception as e:
-        display_once(e)
+        display_once(e, "attention_flash")
         out = torch.nn.functional.scaled_dot_product_attention(q, k, v, attn_mask=mask, dropout_p=0.0, is_causal=False)
 
     out = out.transpose(1, 2).reshape(b, -1, heads * dim_head)
@@ -466,7 +466,7 @@ def pytorch_attention_single_head_spatial(q, k, v):
         out = torch.nn.functional.scaled_dot_product_attention(q, k, v, attn_mask=None, dropout_p=0.0, is_causal=False)
         out = out.transpose(2, 3).reshape(B, C, H, W)
     except memory_management.OOM_EXCEPTION as e:
-        display_once(e)
+        display_once(e, "pytorch_attention_single_head_spatial")
         out = slice_attention_single_head_spatial(q.view(B, -1, C), k.view(B, -1, C).transpose(1, 2), v.view(B, -1, C).transpose(1, 2)).reshape(B, C, H, W)
     return out
 
