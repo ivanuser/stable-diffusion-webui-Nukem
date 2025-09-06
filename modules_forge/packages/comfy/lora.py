@@ -382,7 +382,7 @@ def model_lora_keys_unet(model, key_map={}):
                     diffusers_lora_key = diffusers_lora_key[:-2]
                 key_map[diffusers_lora_key] = unet_key
 
-    if "flux" in model.config.huggingface_repo.lower():  # Diffusers lora Flux
+    if "flux" in model.config.huggingface_repo.lower() or "chroma" in model.config.huggingface_repo.lower():  # Flux/Chroma OneTrainer LoRA
         diffusers_keys = flux_to_diffusers(
             model.diffusion_model.config, output_prefix="diffusion_model."
         )
