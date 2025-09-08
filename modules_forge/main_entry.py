@@ -224,7 +224,8 @@ def modules_change(module_values: list, preset: str, save=True, refresh=True) ->
         return False
 
     shared.opts.set("forge_additional_modules", modules)
-    shared.opts.set(f"forge_additional_modules_{preset}", modules)
+    if preset is not None:
+        shared.opts.set(f"forge_additional_modules_{preset}", modules)
 
     if save:
         shared.opts.save(shared.config_filename)
