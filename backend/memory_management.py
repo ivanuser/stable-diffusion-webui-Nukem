@@ -2,6 +2,7 @@
 
 import platform
 import time
+import weakref
 from enum import Enum
 
 import psutil
@@ -478,6 +479,8 @@ def build_module_profile(model, model_gpu_memory_when_using_cpu_swap):
 class LoadedModel:
     def __init__(self, model: ModelPatcher):
         self.model = model
+        self.real_model = None
+        self.model_finalizer = None
         self.model_accelerated = False
         self.device = model.load_device
         self.inclusive_memory = 0
@@ -498,7 +501,7 @@ class LoadedModel:
         self.model.model_patches_to(self.model.model_dtype())
 
         try:
-            self.real_model = self.model.forge_patch_model(patch_model_to)
+            real_model = self.model.forge_patch_model(patch_model_to)
             self.model.current_device = self.model.load_device
         except Exception as e:
             self.model.forge_unpatch_model(self.model.offload_device)
@@ -506,7 +509,7 @@ class LoadedModel:
             raise e
 
         if not do_not_need_cpu_swap:
-            gpu_modules, gpu_modules_only_extras, cpu_modules = build_module_profile(self.real_model, model_gpu_memory_when_using_cpu_swap)
+            gpu_modules, gpu_modules_only_extras, cpu_modules = build_module_profile(real_model, model_gpu_memory_when_using_cpu_swap)
             pin_memory = PIN_SHARED_MEMORY and is_device_cpu(self.model.offload_device)
 
             mem_counter = 0
@@ -545,18 +548,20 @@ class LoadedModel:
             global signal_empty_cache
             signal_empty_cache = True
 
-        bake_gguf_model(self.real_model)
+        bake_gguf_model(real_model)
 
         self.model.refresh_loras()
 
         if is_intel_xpu() and not args.disable_ipex_hijack:
-            self.real_model = torch.xpu.optimize(self.real_model.eval(), inplace=True, auto_kernel_selection=True, graph_mode=True)
+            real_model = torch.xpu.optimize(real_model.eval(), inplace=True, auto_kernel_selection=True, graph_mode=True)
 
-        return self.real_model
+        self.real_model = weakref.ref(real_model)
+        self.model_finalizer = weakref.finalize(real_model, cleanup_models)
+        return real_model
 
     def model_unload(self, avoid_model_moving=False):
         if self.model_accelerated:
-            for m in self.real_model.modules():
+            for m in self.real_model().modules():
                 if hasattr(m, "prev_parameters_manual_cast"):
                     m.parameters_manual_cast = m.prev_parameters_manual_cast
                     del m.prev_parameters_manual_cast
@@ -568,6 +573,10 @@ class LoadedModel:
         else:
             self.model.forge_unpatch_model(self.model.offload_device)
             self.model.model_patches_to(self.model.offload_device)
+
+        self.model_finalizer.detach()
+        self.model_finalizer = None
+        self.real_model = None
 
     def __eq__(self, other: "LoadedModel"):
         return self.model is other.model
@@ -651,8 +660,7 @@ def load_models_gpu(models, memory_required=0, hard_memory_preservation=0):
     global vram_state
 
     execution_start_time = time.perf_counter()
-    memory_to_free = max(minimum_inference_memory(), memory_required) + hard_memory_preservation
-    memory_for_inference = minimum_inference_memory() + hard_memory_preservation
+    memory_for_inference = max(minimum_inference_memory(), memory_required) + hard_memory_preservation
 
     models_to_load = []
     models_already_loaded = []
@@ -672,7 +680,7 @@ def load_models_gpu(models, memory_required=0, hard_memory_preservation=0):
         devs = set(map(lambda a: a.device, models_already_loaded))
         for d in devs:
             if d != torch.device("cpu"):
-                free_memory(memory_to_free, d, models_already_loaded)
+                free_memory(memory_for_inference, d, models_already_loaded)
 
         if (moving_time := time.perf_counter() - execution_start_time) > 0.1:
             print(f"Memory cleanup has taken {moving_time:.2f} seconds")
@@ -689,7 +697,7 @@ def load_models_gpu(models, memory_required=0, hard_memory_preservation=0):
 
     for device in total_memory_required:
         if device != torch.device("cpu"):
-            free_memory(total_memory_required[device] * 1.3 + memory_to_free, device, models_already_loaded)
+            free_memory(total_memory_required[device] * 1.3 + memory_for_inference, device, models_already_loaded)
 
     for loaded_model in models_to_load:
         model = loaded_model.model
@@ -730,7 +738,14 @@ def load_model_gpu(model):
 
 
 def cleanup_models():
-    unload_all_models()
+    to_delete = [i for i in range(len(current_loaded_models)) if current_loaded_models[i].real_model() is None]
+
+    for i in reversed(to_delete):
+        m = current_loaded_models.pop(i)
+        del m
+
+    if len(to_delete) > 0:
+        soft_empty_cache()
 
 
 def dtype_size(dtype):
