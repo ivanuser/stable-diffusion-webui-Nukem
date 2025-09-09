@@ -1,13 +1,16 @@
-import torch
 import os
 import time
-import httpx
 import warnings
-import gradio.networking
-import safetensors.torch
-
+from functools import wraps
 from pathlib import Path
+
+import gradio.networking
+import httpx
+import safetensors.torch
+import torch
 from tqdm import tqdm
+
+from modules.errors import display
 
 
 def gradio_url_ok_fix(url: str) -> bool:
@@ -25,69 +28,73 @@ def gradio_url_ok_fix(url: str) -> bool:
 
 
 def build_loaded(module, loader_name):
-    original_loader_name = loader_name + '_origin'
+    original_loader_name = f"{loader_name}_origin"
 
     if not hasattr(module, original_loader_name):
         setattr(module, original_loader_name, getattr(module, loader_name))
 
     original_loader = getattr(module, original_loader_name)
 
+    @wraps(original_loader)
     def loader(*args, **kwargs):
-        result = None
         try:
-            result = original_loader(*args, **kwargs)
+            with warnings.catch_warnings():
+                warnings.simplefilter(action="ignore", category=FutureWarning)
+                return original_loader(*args, **kwargs)
         except Exception as e:
-            result = None
-            exp = str(e) + '\n'
+            display(e, f"{module.__name__}.{loader_name}")
+
+            exc = "\n"
             for path in list(args) + list(kwargs.values()):
-                if isinstance(path, str):
-                    if os.path.exists(path):
-                        exp += f'File corrupted: {path} \n'
-                        corrupted_backup_file = path + '.corrupted'
-                        if os.path.exists(corrupted_backup_file):
-                            os.remove(corrupted_backup_file)
-                        os.replace(path, corrupted_backup_file)
-                        if os.path.exists(path):
-                            os.remove(path)
-                        exp += f'Forge has tried to move the corrupted file to {corrupted_backup_file} \n'
-                        exp += f'You may try again now and Forge will download models again. \n'
-            raise ValueError(exp)
-        return result
+                if isinstance(path, str) and os.path.isfile(path):
+                    exc += f'Failed to read file "{path}"\n'
+                    backup_file = f"{path}.corrupted"
+                    if os.path.exists(backup_file):
+                        os.remove(backup_file)
+                    os.replace(path, backup_file)
+                    exc += f'Forge has moved the corrupted file to "{backup_file}"\n'
+                    exc += "Please try downloading the model again\n"
+            print(exc)
+            raise ValueError from None
 
     setattr(module, loader_name, loader)
-    return
 
 
 def always_show_tqdm(*args, **kwargs):
-    kwargs['disable'] = False
-    if 'name' in kwargs:
-        del kwargs['name']
+    kwargs["disable"] = False
+    if "name" in kwargs:
+        del kwargs["name"]
     return tqdm(*args, **kwargs)
 
 
 def long_path_prefix(path: Path) -> Path:
-    if os.name == 'nt' and not str(path).startswith("\\\\?\\") and not path.exists():
+    if os.name == "nt" and not str(path).startswith("\\\\?\\") and not path.exists():
         return Path("\\\\?\\" + str(path))
     return path
 
 
 def patch_all_basics():
     import logging
+
     from huggingface_hub import file_download
+
     file_download.tqdm = always_show_tqdm
+    file_download.logger.setLevel(logging.ERROR)
+
     from transformers.dynamic_module_utils import logger
+
     logger.setLevel(logging.ERROR)
 
     from huggingface_hub.file_download import _download_to_tmp_and_move as original_download_to_tmp_and_move
 
-    def patched_download_to_tmp_and_move(incomplete_path, destination_path, url_to_download, proxies, headers, expected_size, filename, force_download):
+    @wraps(original_download_to_tmp_and_move)
+    def patched_download_to_tmp_and_move(incomplete_path: Path, destination_path: Path, *args, **kwargs):
         incomplete_path = long_path_prefix(incomplete_path)
         destination_path = long_path_prefix(destination_path)
-        return original_download_to_tmp_and_move(incomplete_path, destination_path, url_to_download, proxies, headers, expected_size, filename, force_download)
+        return original_download_to_tmp_and_move(incomplete_path, destination_path, *args, **kwargs)
 
     file_download._download_to_tmp_and_move = patched_download_to_tmp_and_move
 
     gradio.networking.url_ok = gradio_url_ok_fix
-    build_loaded(safetensors.torch, 'load_file')
-    build_loaded(torch, 'load')
-    return
+    build_loaded(safetensors.torch, "load_file")
+    build_loaded(torch, "load")
