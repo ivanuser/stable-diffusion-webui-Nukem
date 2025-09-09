@@ -2,20 +2,13 @@ import os
 
 import gradio as gr
 
-from modules import (
-    localization,
-    sd_emphasis,
-    shared,
-    shared_gradio_themes,
-    shared_items,
-    ui_components,
-    util,
-)
+from backend.text_processing import emphasis as sd_emphasis
+from modules import localization, shared, shared_gradio_themes, shared_items, ui_components, util
 from modules.options import OptionDiv, OptionHTML, OptionInfo, categories, options_section
 from modules.paths_internal import data_path, default_output_dir
 from modules.shared_cmd_options import cmd_opts
-from modules_forge import shared_options as forge_shared_options
 from modules_forge import presets as forge_presets
+from modules_forge import shared_options as forge_shared_options
 
 options_templates = {}
 hide_dirs = shared.hide_dirs

@@ -2,24 +2,34 @@ import torch
 
 
 class Emphasis:
+    """Emphasis class decides how to death with (emphasized:1.1) text in prompts"""
+
     name: str = "Base"
     description: str = ""
+
     tokens: list[list[int]]
+    """tokens from the chunk of the prompt"""
+
     multipliers: torch.Tensor
+    """tensor with multipliers, once for each token"""
+
     z: torch.Tensor
+    """output of cond transformers network (CLIP)"""
 
     def after_transformers(self):
+        """Called after cond transformers network has processed the chunk of the prompt; this function should modify self.z to apply the emphasis"""
+
         pass
 
 
 class EmphasisNone(Emphasis):
     name = "None"
-    description = "disable the mechanism entirely and treat (:.1.1) as literal characters"
+    description = "disable Emphasis entirely and treat (:1.2) as literal characters"
 
 
 class EmphasisIgnore(Emphasis):
     name = "Ignore"
-    description = "treat all empasised words as if they have no emphasis"
+    description = "treat all words as if they have no emphasis"
 
 
 class EmphasisOriginal(Emphasis):
@@ -35,7 +45,7 @@ class EmphasisOriginal(Emphasis):
 
 class EmphasisOriginalNoNorm(EmphasisOriginal):
     name = "No norm"
-    description = "same as original, but without normalization (seems to work better for SDXL)"
+    description = "implementation without normalization (fix certain issues for SDXL)"
 
     def after_transformers(self):
         self.z = self.z * self.multipliers.reshape(self.multipliers.shape + (1,)).expand(self.z.shape)
@@ -46,7 +56,11 @@ def get_current_option(emphasis_option_name):
 
 
 def get_options_descriptions():
-    return ", ".join(f"{x.name}: {x.description}" for x in options)
+    return f"""
+        <ul style='margin-left: 1.5em'><li>
+            {"</li><li>".join(f"<b>{x.name}</b>: {x.description}" for x in options)}
+        </li></ul>
+            """
 
 
 options = [
