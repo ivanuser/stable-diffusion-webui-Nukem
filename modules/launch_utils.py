@@ -405,7 +405,7 @@ def configure_a1111_reference(a1111_home: Path):
     refs = (
         ModelRef(arg_name="--embeddings-dir", relative_path="embeddings"),
         ModelRef(arg_name="--esrgan-models-path", relative_path="ESRGAN"),
-        ModelRef(arg_name="--lora-dir", relative_path="Lora"),
+        ModelRef(arg_name="--lora-dirs", relative_path="Lora"),
         ModelRef(arg_name="--ckpt-dirs", relative_path="Stable-diffusion"),
         ModelRef(arg_name="--text-encoder-dirs", relative_path="text_encoder"),
         ModelRef(arg_name="--vae-dirs", relative_path="VAE"),
