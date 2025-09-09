@@ -42,28 +42,6 @@ class UMT5TextProcessingEngine:
         self.pad_to_max_length = False
         self.min_padding = None
 
-        vocab = self.tokenizer.get_vocab()
-
-        self.comma_token = vocab.get(",</w>", None)
-
-        self.token_mults = {}
-
-        tokens_with_parens = [(k, v) for k, v in vocab.items() if "(" in k or ")" in k or "[" in k or "]" in k]
-        for text, ident in tokens_with_parens:
-            mult = 1.0
-            for c in text:
-                if c == "[":
-                    mult /= 1.1
-                if c == "]":
-                    mult *= 1.1
-                if c == "(":
-                    mult *= 1.1
-                if c == ")":
-                    mult /= 1.1
-
-            if mult != 1.0:
-                self.token_mults[ident] = mult
-
     def tokenize(self, texts):
         return self.tokenizer(texts)["input_ids"]
 

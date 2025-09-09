@@ -81,26 +81,7 @@ class ClassicTextProcessingEngine:
         model_embeddings.token_embedding = CLIPEmbeddingForTextualInversion(model_embeddings.token_embedding, self.embeddings, textual_inversion_key=embedding_key)
 
         vocab = self.tokenizer.get_vocab()
-
-        self.comma_token = vocab.get(",</w>", None)
-
-        self.token_mults = {}
-
-        tokens_with_parens = [(k, v) for k, v in vocab.items() if "(" in k or ")" in k or "[" in k or "]" in k]
-        for text, ident in tokens_with_parens:
-            mult = 1.0
-            for c in text:
-                if c == "[":
-                    mult /= 1.1
-                if c == "]":
-                    mult *= 1.1
-                if c == "(":
-                    mult *= 1.1
-                if c == ")":
-                    mult /= 1.1
-
-            if mult != 1.0:
-                self.token_mults[ident] = mult
+        self.comma_token = vocab[",</w>"]
 
     def empty_chunk(self):
         chunk = PromptChunk()
