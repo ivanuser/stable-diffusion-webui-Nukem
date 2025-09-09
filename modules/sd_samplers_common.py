@@ -39,6 +39,7 @@ approximation_indexes = {"Full": 0, "Approx NN": 1, "RGB": 2, "TAESD": 3}
 
 def samples_to_images_tensor(sample, approximation=None, model=None):
     """Transforms 4-channel latent space images into 3-channel RGB image tensors, with values in range [-1, 1]."""
+    x_sample = None
 
     if approximation is None or (shared.state.interrupted and opts.live_preview_fast_interrupt):
         approximation = approximation_indexes.get(opts.show_progress_type, 0)
@@ -59,7 +60,7 @@ def samples_to_images_tensor(sample, approximation=None, model=None):
 
     if approximation == 2:
         x_sample = sd_vae_approx.cheap_approximation(sample).detach()
-    else:
+    elif x_sample is None:
         x_sample = (model or shared.sd_model).decode_first_stage(sample)
 
     return x_sample
