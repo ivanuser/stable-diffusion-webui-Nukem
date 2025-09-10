@@ -1,15 +1,11 @@
 # https://github.com/comfyanonymous/ComfyUI/blob/v0.3.50/comfy/sd1_clip.py
 # https://github.com/comfyanonymous/ComfyUI/blob/v0.3.50/comfy/text_encoders/wan.py
 
-from collections import namedtuple
-
 import torch
 
 from backend import memory_management
 from backend.text_processing import emphasis, parsing
 from modules.shared import opts
-
-PromptChunkFix = namedtuple("PromptChunkFix", ["offset", "embedding"])
 
 
 class PromptChunk:

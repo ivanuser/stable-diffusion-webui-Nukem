@@ -1,12 +1,8 @@
-from collections import namedtuple
-
 import torch
 
 from backend import memory_management
 from backend.text_processing import emphasis, parsing
 from modules.shared import opts
-
-PromptChunkFix = namedtuple("PromptChunkFix", ["offset", "embedding"])
 
 
 class PromptChunk:
