@@ -39,7 +39,7 @@ class ForgeCanvas {
         initial_height = 512,
         scribbleColor = "#000000",
         scribbleColorFixed = false,
-        scribbleWidth = 4,
+        scribbleWidth = 20,
         scribbleWidthFixed = false,
         scribbleAlpha = 100,
         scribbleAlphaFixed = false,
@@ -134,7 +134,7 @@ class ForgeCanvas {
         const scribbleSoftness = document.getElementById(`scribbleSoftness_${self.uuid}`);
         scribbleSoftness.value = self.scribbleSoftness;
 
-        const indicatorSize = self.scribbleWidth * 20;
+        const indicatorSize = self.scribbleWidth * 4;
         scribbleIndicator.style.width = `${indicatorSize}px`;
         scribbleIndicator.style.height = `${indicatorSize}px`;
 
@@ -217,7 +217,7 @@ class ForgeCanvas {
 
         scribbleWidth.addEventListener("input", (e) => {
             self.scribbleWidth = e.target.value;
-            const indicatorSize = self.scribbleWidth * 20;
+            const indicatorSize = self.scribbleWidth * 4;
             scribbleIndicator.style.width = `${indicatorSize}px`;
             scribbleIndicator.style.height = `${indicatorSize}px`;
         });
@@ -245,7 +245,7 @@ class ForgeCanvas {
             if (self.drawing) self.handleDraw(e);
             if (self.img && !self.drawing && !self.dragging && !self.no_scribbles) {
                 const rect = container.getBoundingClientRect();
-                const indicatorSize = self.scribbleWidth * 10;
+                const indicatorSize = self.scribbleWidth * 2;
                 scribbleIndicator.style.left = `${e.clientX - rect.left - indicatorSize}px`;
                 scribbleIndicator.style.top = `${e.clientY - rect.top - indicatorSize}px`;
                 scribbleIndicator.style.display = "inline-block";
@@ -312,7 +312,7 @@ class ForgeCanvas {
 
             if (this._held_W) {
                 // Width
-                scribbleWidth.value = parseInt(scribbleWidth.value) - Math.sign(e.deltaY);
+                scribbleWidth.value = parseInt(scribbleWidth.value) - Math.sign(e.deltaY) * 5;
                 updateInput(scribbleWidth);
                 scale = false;
             }
@@ -485,7 +485,7 @@ class ForgeCanvas {
 
         ctx.lineCap = "round";
         ctx.lineJoin = "round";
-        ctx.lineWidth = (this.scribbleWidth / this.imgScale) * 20;
+        ctx.lineWidth = (this.scribbleWidth / this.imgScale) * 4;
 
         if (this.contrast_scribbles) {
             ctx.strokeStyle = this.contrast_pattern;
