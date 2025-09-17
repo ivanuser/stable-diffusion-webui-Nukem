@@ -11,6 +11,7 @@ import backend.args
 from backend import memory_management
 from backend.diffusion_engine.chroma import Chroma
 from backend.diffusion_engine.flux import Flux
+from backend.diffusion_engine.qwen import QwenImage
 from backend.diffusion_engine.sd15 import StableDiffusion
 from backend.diffusion_engine.sdxl import StableDiffusionXL, StableDiffusionXLRefiner
 from backend.diffusion_engine.wan import Wan
@@ -26,7 +27,7 @@ from backend.utils import (
     read_arbitrary_config,
 )
 
-possible_models = [StableDiffusion, StableDiffusionXLRefiner, StableDiffusionXL, Chroma, Flux, Wan]
+possible_models = [StableDiffusion, StableDiffusionXLRefiner, StableDiffusionXL, Chroma, Flux, Wan, QwenImage]
 
 
 logging.getLogger("diffusers").setLevel(logging.ERROR)
@@ -60,7 +61,7 @@ def load_huggingface_component(guess, component_name, lib_name, cls_name, repo_p
                 state_dict = huggingface_guess.diffusers_convert.convert_vae_state_dict(state_dict)
             load_state_dict(model, state_dict, ignore_start="loss.")
             return model
-        if cls_name == "AutoencoderKLWan":
+        if cls_name in ["AutoencoderKLWan", "AutoencoderKLQwenImage"]:
             assert isinstance(state_dict, dict) and len(state_dict) > 16, "You do not have VAE state dict!"
 
             config = WanVAE.load_config(config_path)
@@ -84,6 +85,38 @@ def load_huggingface_component(guess, component_name, lib_name, cls_name, repo_p
                     model = IntegratedCLIP(CLIPTextModel, config, add_text_projection=True).to(**to_args)
 
             load_state_dict(model, state_dict, ignore_errors=["transformer.text_projection.weight", "transformer.text_model.embeddings.position_ids", "logit_scale"], log_name=cls_name)
+
+            return model
+        if cls_name == "Qwen2_5_VLForConditionalGeneration":
+            assert isinstance(state_dict, dict) and len(state_dict) > 16, "You do not have Qwen 2.5 state dict!"
+
+            from backend.nn.llm.llama import Qwen25_7BVLI
+
+            config = read_arbitrary_config(config_path)
+
+            storage_dtype = memory_management.text_encoder_dtype()
+            state_dict_dtype = memory_management.state_dict_dtype(state_dict)
+
+            if state_dict_dtype in [torch.float8_e4m3fn, torch.float8_e5m2, "nf4", "fp4", "gguf"]:
+                print(f"Using Detected Qwen2.5 Data Type: {state_dict_dtype}")
+                storage_dtype = state_dict_dtype
+                if state_dict_dtype in ["nf4", "fp4", "gguf"]:
+                    print("Using pre-quant state dict!")
+                    if state_dict_dtype in ["gguf"]:
+                        beautiful_print_gguf_state_dict_statics(state_dict)
+            else:
+                print(f"Using Default Qwen2.5 Data Type: {storage_dtype}")
+
+            if storage_dtype in ["nf4", "fp4", "gguf"]:
+                with modeling_utils.no_init_weights():
+                    with using_forge_operations(device=memory_management.cpu, dtype=memory_management.text_encoder_dtype(), manual_cast_enabled=False, bnb_dtype=storage_dtype):
+                        model = Qwen25_7BVLI(config)
+            else:
+                with modeling_utils.no_init_weights():
+                    with using_forge_operations(device=memory_management.cpu, dtype=storage_dtype, manual_cast_enabled=True):
+                        model = Qwen25_7BVLI(config)
+
+            load_state_dict(model, state_dict, log_name=cls_name, ignore_errors=["lm_head.weight"])
 
             return model
         if cls_name in ["T5EncoderModel", "UMT5EncoderModel"]:
@@ -124,10 +157,10 @@ def load_huggingface_component(guess, component_name, lib_name, cls_name, repo_p
                     with using_forge_operations(device=memory_management.cpu, dtype=storage_dtype, manual_cast_enabled=True):
                         model = IntegratedT5(config)
 
-            load_state_dict(model, state_dict, log_name=cls_name, ignore_errors=["transformer.encoder.embed_tokens.weight", "logit_scale", "transformer.scaled_fp8"])
+            load_state_dict(model, state_dict, log_name=cls_name, ignore_errors=["transformer.encoder.embed_tokens.weight", "logit_scale"])
 
             return model
-        if cls_name in ["UNet2DConditionModel", "FluxTransformer2DModel", "ChromaTransformer2DModel", "WanTransformer3DModel"]:
+        if cls_name in ["UNet2DConditionModel", "FluxTransformer2DModel", "ChromaTransformer2DModel", "WanTransformer3DModel", "QwenImageTransformer2DModel"]:
             assert isinstance(state_dict, dict) and len(state_dict) > 16, "You do not have model state dict!"
 
             model_loader = None
@@ -150,6 +183,15 @@ def load_huggingface_component(guess, component_name, lib_name, cls_name, repo_p
                 from backend.nn.wan import WanModel
 
                 model_loader = lambda c: WanModel(**c)
+            elif cls_name == "QwenImageTransformer2DModel":
+                if guess.nunchaku:
+                    from backend.nn.svdq import NunchakuQwenImageTransformer2DModel
+
+                    model_loader = lambda c: NunchakuQwenImageTransformer2DModel(**c)
+                else:
+                    from backend.nn.qwen import QwenImageTransformer2DModel
+
+                    model_loader = lambda c: QwenImageTransformer2DModel(**c)
 
             unet_config = guess.unet_config.copy()
             state_dict_parameters = memory_management.state_dict_parameters(state_dict)
@@ -244,7 +286,6 @@ def replace_state_dict(sd: dict[str, torch.Tensor], asd: dict[str, torch.Tensor]
             sd[vae_key_prefix + k] = v
 
     ##  identify model type
-    wan_test_key = "model.diffusion_model.head.modulation"
     flux_test_key = "model.diffusion_model.double_blocks.0.img_attn.norm.key_norm.scale"
     svdq_test_key = "model.diffusion_model.single_transformer_blocks.0.mlp_fc1.qweight"
     legacy_test_key = "model.diffusion_model.input_blocks.4.1.transformer_blocks.0.attn2.to_k.weight"
@@ -260,8 +301,6 @@ def replace_state_dict(sd: dict[str, torch.Tensor], asd: dict[str, torch.Tensor]
                 model_type = "sdxl"
     elif flux_test_key in sd or svdq_test_key in sd:
         model_type = "flux"
-    elif wan_test_key in sd:
-        model_type = "wan"
 
     ##  prefixes used by various model types for CLIP-L
     prefix_L = {
@@ -270,7 +309,6 @@ def replace_state_dict(sd: dict[str, torch.Tensor], asd: dict[str, torch.Tensor]
         "xlrf": None,
         "sdxl": "conditioner.embedders.0.transformer.",
         "flux": "text_encoders.clip_l.transformer.",
-        "wan": None,
     }
     ##  prefixes used by various model types for CLIP-G
     prefix_G = {
@@ -279,7 +317,6 @@ def replace_state_dict(sd: dict[str, torch.Tensor], asd: dict[str, torch.Tensor]
         "xlrf": "conditioner.embedders.0.model.transformer.",
         "sdxl": "conditioner.embedders.1.model.transformer.",
         "flux": None,
-        "wan": None,
     }
 
     ##  VAE format 0 (extracted from model, could be sd1/sdxl)
@@ -427,6 +464,12 @@ def replace_state_dict(sd: dict[str, torch.Tensor], asd: dict[str, torch.Tensor]
         for k, v in asd.items():
             sd[f"{text_encoder_key_prefix}t5xxl.transformer.{k}"] = True
         sd[f"{text_encoder_key_prefix}t5xxl.transformer.filename"] = str(path)
+
+    if "model.layers.0.self_attn.k_proj.bias" in asd:
+        weight = asd["model.layers.0.self_attn.k_proj.bias"]
+        assert weight.shape[0] == 512
+        for k, v in asd.items():
+            sd[f"{text_encoder_key_prefix}qwen25.{k}"] = v
 
     return sd
 
