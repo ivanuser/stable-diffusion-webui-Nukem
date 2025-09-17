@@ -9,63 +9,58 @@ import torch
 from einops import rearrange
 from torch import nn
 
+from backend import memory_management
 from backend.attention import attention_function
 from backend.utils import fp16_fix, process_img, tensor2parameter
 
 
-def attention(q, k, v, pe):
-    q, k = apply_rope(q, k, pe)
-    x = attention_function(q, k, v, q.shape[1], skip_reshape=True)
+def attention(q: torch.Tensor, k: torch.Tensor, v: torch.Tensor, pe: torch.Tensor) -> torch.Tensor:
+    q_shape = q.shape
+    k_shape = k.shape
+
+    if pe is not None:
+        q = q.to(dtype=pe.dtype).reshape(*q.shape[:-1], -1, 1, 2)
+        k = k.to(dtype=pe.dtype).reshape(*k.shape[:-1], -1, 1, 2)
+        q = (pe[..., 0] * q[..., 0] + pe[..., 1] * q[..., 1]).reshape(*q_shape).type_as(v)
+        k = (pe[..., 0] * k[..., 0] + pe[..., 1] * k[..., 1]).reshape(*k_shape).type_as(v)
+
+    heads = q.shape[1]
+    x = attention_function(q, k, v, heads, skip_reshape=True)
     return x
 
 
-def rope(pos, dim, theta):
-    if pos.device.type == "mps" or pos.device.type == "xpu":
-        scale = torch.arange(0, dim, 2, dtype=torch.float32, device=pos.device) / dim
+def rope(pos: torch.Tensor, dim: int, theta: int) -> torch.Tensor:
+    assert dim % 2 == 0
+    if memory_management.is_device_mps(pos.device) or memory_management.is_intel_xpu() or memory_management.directml_enabled:
+        device = torch.device("cpu")
     else:
-        scale = torch.arange(0, dim, 2, dtype=torch.float64, device=pos.device) / dim
+        device = pos.device
+
+    scale = torch.linspace(0, (dim - 2) / dim, steps=dim // 2, dtype=torch.float64, device=device)
     omega = 1.0 / (theta**scale)
-
-    # out = torch.einsum("...n,d->...nd", pos, omega)
-    out = pos.unsqueeze(-1) * omega.unsqueeze(0)
-
-    cos_out = torch.cos(out)
-    sin_out = torch.sin(out)
-    out = torch.stack([cos_out, -sin_out, sin_out, cos_out], dim=-1)
-    del cos_out, sin_out
-
-    # out = rearrange(out, "b n d (i j) -> b n d i j", i=2, j=2)
-    b, n, d, _ = out.shape
-    out = out.view(b, n, d, 2, 2)
-
-    return out.float()
+    out = torch.einsum("...n,d->...nd", pos.to(dtype=torch.float32, device=device), omega)
+    out = torch.stack([torch.cos(out), -torch.sin(out), torch.sin(out), torch.cos(out)], dim=-1)
+    out = rearrange(out, "b n d (i j) -> b n d i j", i=2, j=2)
+    return out.to(dtype=torch.float32, device=pos.device)
 
 
-def apply_rope(xq, xk, freqs_cis):
-    xq_ = xq.float().reshape(*xq.shape[:-1], -1, 1, 2)
-    xk_ = xk.float().reshape(*xk.shape[:-1], -1, 1, 2)
-    xq_out = freqs_cis[..., 0] * xq_[..., 0] + freqs_cis[..., 1] * xq_[..., 1]
-    xk_out = freqs_cis[..., 0] * xk_[..., 0] + freqs_cis[..., 1] * xk_[..., 1]
-    del xq_, xk_
-    return xq_out.reshape(*xq.shape).type_as(xq), xk_out.reshape(*xk.shape).type_as(xk)
+def _apply_rope(x: torch.Tensor, freqs_cis: torch.Tensor) -> torch.Tensor:
+    x_ = x.to(dtype=freqs_cis.dtype).reshape(*x.shape[:-1], -1, 1, 2)
+    x_out = freqs_cis[..., 0] * x_[..., 0] + freqs_cis[..., 1] * x_[..., 1]
+    return x_out.reshape(*x.shape).type_as(x)
 
 
-def timestep_embedding(t, dim, max_period=10000, time_factor=1000.0):
+def apply_rope(xq: torch.Tensor, xk: torch.Tensor, freqs_cis: torch.Tensor):
+    return _apply_rope(xq, freqs_cis), _apply_rope(xk, freqs_cis)
+
+
+def timestep_embedding(t: torch.Tensor, dim: int, max_period: int = 10000, time_factor: float = 1000.0) -> torch.Tensor:
     t = time_factor * t
     half = dim // 2
-
-    # TODO: Once A trainer for flux get popular, make timestep_embedding consistent to that trainer
-
-    # Do not block CUDA steam, but having about 1e-4 differences with Flux official codes:
     freqs = torch.exp(-math.log(max_period) * torch.arange(start=0, end=half, dtype=torch.float32, device=t.device) / half)
 
-    # Block CUDA steam, but consistent with official codes:
-    # freqs = torch.exp(-math.log(max_period) * torch.arange(start=0, end=half, dtype=torch.float32) / half).to(t.device)
-
     args = t[:, None].float() * freqs[None]
-    del freqs
     embedding = torch.cat([torch.cos(args), torch.sin(args)], dim=-1)
-    del args
     if dim % 2:
         embedding = torch.cat([embedding, torch.zeros_like(embedding[:, :1])], dim=-1)
     if torch.is_floating_point(t):
