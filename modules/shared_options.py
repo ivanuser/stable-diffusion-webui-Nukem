@@ -545,9 +545,13 @@ options_templates.update(
     options_section(
         ("svdq", "Nunchaku", "svdq"),
         {
-            "svdq_cpu_offload": OptionInfo(True, "CPU Offload").info("recommended if the VRAM is less than 14 GB"),
+            "svdq_cpu_offload": OptionInfo(True, "CPU Offload").info("recommended if the VRAM is less than 16 GB"),
+            "svdq_flux_exp": OptionHTML("Flux"),
             "svdq_cache_threshold": OptionInfo(0.0, "Cache Threshold", gr.Slider, {"minimum": 0.0, "maximum": 1.0, "step": 0.01}).info("increasing the value enhances speed at the cost of quality; a typical value is 0.12; setting it to 0 disables the effect"),
             "svdq_attention": OptionInfo("nunchaku-fp16", "Attention", gr.Radio, {"choices": ["nunchaku-fp16", "flashattn2"]}).info("RTX 20s GPUs can only use nunchaku-fp16"),
+            "svdq_qwen_exp": OptionHTML("Qwen"),
+            "svdq_use_pin_memory": OptionInfo(False, "Use Pinned Memory").info("improve load speed at the cost of higher RAM usage"),
+            "svdq_num_blocks_on_gpu": OptionInfo(1, "Blocks on GPU", gr.Slider, {"minimum": 1, "maximum": 60, "step": 1}).info("higher = more VRAM usage ; lower = more RAM usage"),
         },
     )
 )

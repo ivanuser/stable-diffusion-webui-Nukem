@@ -332,6 +332,20 @@ def prepare_environment():
         triton_package = os.environ.get("TRITION_PACKAGE", f"triton=={ver_TRITON}")
         nunchaku_package = os.environ.get("NUNCHAKU_PACKAGE", f"https://github.com/nunchaku-tech/nunchaku/releases/download/v{ver_NUNCHAKU}/nunchaku-{ver_NUNCHAKU}+torch{ver_TORCH[:3]}-{ver_PY}-{ver_PY}-linux_x86_64.whl")
 
+    def _verify_nunchaku() -> bool:
+        import importlib.metadata
+
+        import packaging.version
+
+        if not is_installed("nunchaku"):
+            return False
+
+        ver_installed: str = importlib.metadata.version("nunchaku")
+        current: tuple[int] = packaging.version.parse(ver_installed)
+        target: tuple[int] = packaging.version.parse(ver_NUNCHAKU)
+
+        return current >= target
+
     if not is_installed("clip"):
         run_pip(f"install {clip_package}", "clip")
         startup_timer.record("install clip")
@@ -356,7 +370,7 @@ def prepare_environment():
         else:
             startup_timer.record("install flash_attn")
 
-    if not is_installed("nunchaku") or args.reinstall_nunchaku:
+    if not _verify_nunchaku():
         try:
             run_pip(f"install {nunchaku_package}", "nunchaku")
         except RuntimeError:
