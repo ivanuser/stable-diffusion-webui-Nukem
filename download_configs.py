@@ -5,19 +5,18 @@ import shutil
 
 from huggingface_hub import snapshot_download
 
-DIFFUSERS_DEFAULT_PIPELINE_PATHS = [
-    {"pretrained_model_name_or_path": "Wan-AI/Wan2.1-T2V-14B-Diffusers"},
-    {"pretrained_model_name_or_path": "Wan-AI/Wan2.1-I2V-14B-720P-Diffusers"},
-    {"pretrained_model_name_or_path": "Wan-AI/Wan2.2-TI2V-5B-Diffusers"},
-]
+PIPELINE_PATHS = (
+    # "Wan-AI/Wan2.1-T2V-14B-Diffusers",
+    # "Wan-AI/Wan2.1-I2V-14B-720P-Diffusers",
+    "Qwen/Qwen-Image",
+)
 
-for config in DIFFUSERS_DEFAULT_PIPELINE_PATHS:
+for pretrained in PIPELINE_PATHS:
     try:
-        pretrained_model_name_or_path = config["pretrained_model_name_or_path"]
-        local_dir = os.path.join("backend", "huggingface", pretrained_model_name_or_path)
+        local_dir = os.path.join("backend", "huggingface", pretrained.removesuffix("-Diffusers"))
         os.makedirs(local_dir, exist_ok=True)
 
-        snapshot_download(pretrained_model_name_or_path, local_dir=local_dir, allow_patterns=["*.json", "*.txt"], token=None, force_download=True)
+        snapshot_download(pretrained, local_dir=local_dir, allow_patterns=["*.json", "*.txt"], token=None, force_download=True)
 
         shutil.rmtree(os.path.join(local_dir, ".cache"))
 
@@ -35,6 +34,6 @@ for config in DIFFUSERS_DEFAULT_PIPELINE_PATHS:
             with open(file, "w", newline="\r\n", encoding="utf-8") as outfile:
                 outfile.writelines(lines)
 
-        print(pretrained_model_name_or_path)
+        print(pretrained)
     except Exception as e:
         print(e)
