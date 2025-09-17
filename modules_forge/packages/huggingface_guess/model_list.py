@@ -375,6 +375,38 @@ class WAN21_I2V(WAN21_T2V):
     }
 
 
+class QwenImage(BASE):
+    huggingface_repo = "Qwen/Qwen-Image"
+
+    unet_config = {
+        "image_model": "qwen_image",
+    }
+
+    sampling_settings = {
+        "multiplier": 1.0,
+        "shift": 1.15,
+    }
+
+    memory_usage_factor = 1.8
+
+    unet_extra_config = {}
+    latent_format = latent.Wan21
+
+    supported_inference_dtypes = [torch.bfloat16, torch.float32]
+
+    vae_key_prefix = ["vae."]
+    text_encoder_key_prefix = ["text_encoders."]
+
+    unet_target = "transformer"
+
+    def __init__(self, unet_config):
+        super().__init__(unet_config)
+        self.nunchaku: bool = self.unet_config.pop("nunchaku", False)
+
+    def clip_target(self, state_dict={}):
+        return {"qwen25": "text_encoder"}
+
+
 models = [
     SD15,
     SDXL,
@@ -384,4 +416,5 @@ models = [
     Chroma,
     WAN21_T2V,
     WAN21_I2V,
+    QwenImage,
 ]
