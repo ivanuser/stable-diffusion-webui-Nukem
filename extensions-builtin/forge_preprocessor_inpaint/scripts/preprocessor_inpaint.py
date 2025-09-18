@@ -1,24 +1,25 @@
 import os
-import cv2
-import torch
-import numpy as np
-import yaml
-import einops
 
-from omegaconf import OmegaConf
-from modules_forge.supported_preprocessor import Preprocessor, PreprocessorParameter
-from modules_forge.utils import numpy_to_pytorch, resize_image_with_pad
-from modules_forge.shared import preprocessor_dir, add_supported_preprocessor
-from modules.modelloader import load_file_from_url
+import cv2
+import einops
+import numpy as np
+import torch
+import yaml
 from annotator.lama.saicinpainting.training.trainers import load_checkpoint
+from omegaconf import OmegaConf
+
+from modules.modelloader import load_file_from_url
+from modules_forge.shared import add_supported_preprocessor, preprocessor_dir
+from modules_forge.supported_preprocessor import Preprocessor, PreprocessorParameter
+from modules_forge.utils import resize_image_with_pad
 
 
 class PreprocessorInpaint(Preprocessor):
     def __init__(self):
         super().__init__()
-        self.name = 'inpaint_global_harmonious'
-        self.tags = ['Inpaint']
-        self.model_filename_filters = ['inpaint']
+        self.name = "inpaint_global_harmonious"
+        self.tags = ["Inpaint"]
+        self.model_filename_filters = ["inpaint"]
         self.slider_resolution = PreprocessorParameter(visible=False)
         self.fill_mask_with_one_when_resize_and_fill = True
         self.expand_mask_when_resize_and_fill = True
@@ -32,7 +33,7 @@ class PreprocessorInpaint(Preprocessor):
 class PreprocessorInpaintOnly(PreprocessorInpaint):
     def __init__(self):
         super().__init__()
-        self.name = 'inpaint_only'
+        self.name = "inpaint_only"
         self.image = None
         self.mask = None
         self.latent = None
@@ -62,7 +63,7 @@ class PreprocessorInpaintOnly(PreprocessorInpaint):
             return model, c, uc, x, timestep, model_options
 
         def post_cfg(args):
-            denoised = args['denoised']
+            denoised = args["denoised"]
             denoised = denoised * latent_mask.to(denoised) + latent_image.to(denoised) * (1.0 - latent_mask.to(denoised))
             return denoised
 
@@ -98,17 +99,17 @@ class PreprocessorInpaintOnly(PreprocessorInpaint):
 class PreprocessorInpaintLama(PreprocessorInpaintOnly):
     def __init__(self):
         super().__init__()
-        self.name = 'inpaint_only+lama'
+        self.name = "inpaint_only+lama"
 
     def load_model(self):
         remote_model_path = "https://huggingface.co/lllyasviel/Annotators/resolve/main/ControlNetLama.pth"
         model_path = load_file_from_url(remote_model_path, model_dir=preprocessor_dir)
-        config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'lama_config.yaml')
-        cfg = yaml.safe_load(open(config_path, 'rt'))
+        config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "lama_config.yaml")
+        cfg = yaml.safe_load(open(config_path, "rt"))
         cfg = OmegaConf.create(cfg)
         cfg.training_model.predict_only = True
-        cfg.visualizer.kind = 'noop'
-        model = load_checkpoint(cfg, os.path.abspath(model_path), strict=False, map_location='cpu')
+        cfg.visualizer.kind = "noop"
+        model = load_checkpoint(cfg, os.path.abspath(model_path), strict=False, map_location="cpu")
         self.setup_model_patcher(model)
         return
 
@@ -136,9 +137,9 @@ class PreprocessorInpaintLama(PreprocessorInpaintOnly):
             mask = (mask > 0.5).float()
             color = color * (1 - mask)
             image_feed = torch.cat([color, mask], dim=2)
-            image_feed = einops.rearrange(image_feed, 'h w c -> 1 c h w')
+            image_feed = einops.rearrange(image_feed, "h w c -> 1 c h w")
             prd_color = self.model_patcher.model(image_feed)[0]
-            prd_color = einops.rearrange(prd_color, 'c h w -> h w c')
+            prd_color = einops.rearrange(prd_color, "c h w -> h w c")
             prd_color = prd_color * mask + color * (1 - mask)
             prd_color *= 255.0
             prd_color = prd_color.detach().cpu().numpy().clip(0, 255).astype(np.uint8)
@@ -155,9 +156,57 @@ class PreprocessorInpaintLama(PreprocessorInpaintOnly):
     def process_before_every_sampling(self, process, cond, mask, *args, **kwargs):
         cond, mask = super().process_before_every_sampling(process, cond, mask, *args, **kwargs)
         sigma_max = process.sd_model.forge_objects.unet.model.predictor.sigma_max
-        original_noise = kwargs['noise']
+        original_noise = kwargs["noise"]
         process.modified_noise = original_noise + self.latent.to(original_noise) / sigma_max.to(original_noise)
         return cond, mask
+
+
+class PreprocessorInpaintNoobAIXL(PreprocessorInpaint):
+    def __init__(self):
+        super().__init__()
+        self.name = "inpaint_noobai"
+        self.tags = ["Inpaint"]
+        self.model_filename_filters = ["inpaint", "noobai"]
+
+    def __call__(
+        self,
+        input_image,
+        resolution=512,
+        slider_1=None,
+        slider_2=None,
+        slider_3=None,
+        input_mask=None,
+        **kwargs,
+    ):
+        if input_mask is None:
+            return input_image
+
+        if not isinstance(input_image, np.ndarray):
+            input_image = np.array(input_image)
+        if not isinstance(input_mask, np.ndarray):
+            input_mask = np.array(input_mask)
+
+        mask = input_mask.astype(np.float32) / 255.0
+        mask = (mask > 0.5).astype(bool)
+
+        if mask.ndim == 2:
+            mask = np.expand_dims(mask, axis=-1)
+        if mask.shape[-1] == 1:
+            mask = np.repeat(mask, 3, axis=-1)
+
+        result = input_image.copy()
+        result[mask] = 0.0
+
+        return result
+
+    def process_before_every_sampling(self, process, cond, mask, *args, **kwargs):
+        if process.denoising_strength < 0.8:
+            print("Higher Denoising Strength is Recommended!")
+
+        mask = mask.round()
+        mixed_cond = cond * (1.0 - mask)
+
+        return mixed_cond, None
 
 
 add_supported_preprocessor(PreprocessorInpaint())
@@ -165,3 +214,5 @@ add_supported_preprocessor(PreprocessorInpaint())
 add_supported_preprocessor(PreprocessorInpaintOnly())
 
 add_supported_preprocessor(PreprocessorInpaintLama())
+
+add_supported_preprocessor(PreprocessorInpaintNoobAIXL())
