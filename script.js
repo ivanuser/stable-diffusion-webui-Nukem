@@ -159,8 +159,10 @@ document.addEventListener("keydown", function (e) {
         get_uiCurrentTabContent().querySelector("button[id$=_skip]");
 
     if (isCtrlKey && isEnter) {
+        e.preventDefault();
         if (interruptButton.style.display === "block") {
             interruptButton.click();
+            if (opts.ctrl_enter_interrupt) return;
             const callback = (mutationList) => {
                 for (const mutation of mutationList) {
                     if (
@@ -179,7 +181,6 @@ document.addEventListener("keydown", function (e) {
         } else {
             generateButton.click();
         }
-        e.preventDefault();
     }
 
     if (isAltKey && isEnter) {
