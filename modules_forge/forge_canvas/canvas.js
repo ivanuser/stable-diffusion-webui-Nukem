@@ -114,6 +114,9 @@ class ForgeCanvas {
         const uploadHint = document.getElementById(`uploadHint_${self.uuid}`);
         const scribbleIndicator = document.getElementById(`scribbleIndicator_${self.uuid}`);
 
+        minButton.style.display = "none";
+        this.maximized = false;
+
         const scribbleColorBlock = document.getElementById(`scribbleColorBlock_${self.uuid}`);
         if (self.scribbleColorFixed) scribbleColorBlock.style.display = "none";
         const scribbleColor = document.getElementById(`scribbleColor_${self.uuid}`);
@@ -122,17 +125,23 @@ class ForgeCanvas {
         const scribbleWidthBlock = document.getElementById(`scribbleWidthBlock_${self.uuid}`);
         if (self.scribbleWidthFixed) scribbleWidthBlock.style.display = "none";
         const scribbleWidth = document.getElementById(`scribbleWidth_${self.uuid}`);
+        const scribbleWidthLabel = document.getElementById(`widthLabel_${self.uuid}`);
         scribbleWidth.value = self.scribbleWidth;
+        scribbleWidthLabel.textContent = `Brush Width (${self.scribbleWidth})`;
 
         const scribbleAlphaBlock = document.getElementById(`scribbleAlphaBlock_${self.uuid}`);
         if (self.scribbleAlphaFixed) scribbleAlphaBlock.style.display = "none";
         const scribbleAlpha = document.getElementById(`scribbleAlpha_${self.uuid}`);
+        const scribbleAlphaLabel = document.getElementById(`alphaLabel_${self.uuid}`);
         scribbleAlpha.value = self.scribbleAlpha;
+        scribbleAlphaLabel.textContent = `Brush Opacity (${self.scribbleAlpha})`;
 
         const scribbleSoftnessBlock = document.getElementById(`scribbleSoftnessBlock_${self.uuid}`);
         if (self.scribbleSoftnessFixed) scribbleSoftnessBlock.style.display = "none";
         const scribbleSoftness = document.getElementById(`scribbleSoftness_${self.uuid}`);
+        const scribbleSoftnessLabel = document.getElementById(`softnessLabel_${self.uuid}`);
         scribbleSoftness.value = self.scribbleSoftness;
+        scribbleSoftnessLabel.textContent = `Brush Softness (${self.scribbleSoftness})`;
 
         const indicatorSize = self.scribbleWidth * 4;
         scribbleIndicator.style.width = `${indicatorSize}px`;
@@ -189,8 +198,8 @@ class ForgeCanvas {
         });
 
         removeButton.addEventListener("click", () => {
-            self.removeImage();
             self.resetImage();
+            self.removeImage();
         });
 
         centerButton.addEventListener("click", () => {
@@ -217,6 +226,7 @@ class ForgeCanvas {
 
         scribbleWidth.addEventListener("input", (e) => {
             self.scribbleWidth = e.target.value;
+            scribbleWidthLabel.textContent = `Brush Width (${self.scribbleWidth})`;
             const indicatorSize = self.scribbleWidth * 4;
             scribbleIndicator.style.width = `${indicatorSize}px`;
             scribbleIndicator.style.height = `${indicatorSize}px`;
@@ -224,10 +234,12 @@ class ForgeCanvas {
 
         scribbleAlpha.addEventListener("input", (e) => {
             self.scribbleAlpha = e.target.value;
+            scribbleAlphaLabel.textContent = `Brush Opacity (${self.scribbleAlpha})`;
         });
 
         scribbleSoftness.addEventListener("input", (e) => {
             self.scribbleSoftness = e.target.value;
+            scribbleSoftnessLabel.textContent = `Brush Softness (${self.scribbleSoftness})`;
         });
 
         drawingCanvas.addEventListener("pointerdown", (e) => {
@@ -435,6 +447,22 @@ class ForgeCanvas {
             if (e.ctrlKey && e.key === "y") {
                 e.preventDefault();
                 this.redo();
+            }
+            if (e.ctrlKey && e.key === "x") {
+                e.preventDefault();
+                this.resetImage();
+            }
+            if (e.key === "e") {
+                scribbleColor.click();
+            }
+            if (e.key === "r") {
+                centerButton.click();
+            }
+            if (e.key === "f") {
+                if (maxButton.style.display === "none")
+                    minButton.click();
+                else
+                    maxButton.click();
             }
 
             if (e.key === "w") this._held_W = true;

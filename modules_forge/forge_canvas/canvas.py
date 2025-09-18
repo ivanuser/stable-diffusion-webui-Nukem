@@ -122,7 +122,7 @@ class LogicalImage(gr.Textbox):
 
 
 class ForgeCanvas:
-    def __init__(self, no_upload=False, no_scribbles=False, contrast_scribbles=False, height=512, scribble_color="#000000", scribble_color_fixed=False, scribble_width=4, scribble_width_fixed=False, scribble_alpha=100, scribble_alpha_fixed=False, scribble_softness=0, scribble_softness_fixed=False, visible=True, numpy=False, initial_image=None, elem_id=None, elem_classes=None):
+    def __init__(self, no_upload=False, no_scribbles=False, contrast_scribbles=False, height=512, scribble_color="#000000", scribble_color_fixed=False, scribble_width=25, scribble_width_fixed=False, scribble_alpha=100, scribble_alpha_fixed=False, scribble_softness=0, scribble_softness_fixed=False, visible=True, numpy=False, initial_image=None, elem_id=None, elem_classes=None):
         self.uuid = "uuid_" + uuid.uuid4().hex
 
         canvas_html_uuid = canvas_html.replace("forge_mixin", self.uuid)
