@@ -324,8 +324,12 @@ class ForgeCanvas {
 
             if (this._held_W) {
                 // Width
-                scribbleWidth.value = parseInt(scribbleWidth.value) - Math.sign(e.deltaY) * 5;
+                scribbleWidth.value = parseInt(scribbleWidth.value) - Math.sign(e.deltaY) * 3;
                 updateInput(scribbleWidth);
+                const rect = container.getBoundingClientRect();
+                const indicatorSize = self.scribbleWidth * 2;
+                scribbleIndicator.style.left = `${e.clientX - rect.left - indicatorSize}px`;
+                scribbleIndicator.style.top = `${e.clientY - rect.top - indicatorSize}px`;
                 scale = false;
             }
             if (this._held_A) {
