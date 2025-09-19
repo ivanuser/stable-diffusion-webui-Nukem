@@ -82,9 +82,6 @@ class SVDQFluxTransformer2DModel(nn.Module):
 
         txt_ids = torch.zeros((bs, context.shape[1], 3), device=x.device, dtype=x.dtype)
 
-        if shared.sd_model.current_lora_hash == str([]):
-            self.loras.clear()
-
         # load and compose LoRA
         if self.loras != model.comfy_lora_meta_list:
             lora_to_be_composed = []

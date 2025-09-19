@@ -18,20 +18,11 @@ from modules import errors, scripts, sd_models, shared
 
 
 def load_lora_for_models(model: "UnetPatcher", clip, lora, strength_model, strength_clip, filename="default", online_mode=False):
-    model_flag: str = type(model.model).__name__ if model is not None else "default"
-    nunchaku_flag: bool = dynamic_args.get("nunchaku", False)
-
-    if nunchaku_flag:
-        _del = None
-        for i, (name, _) in enumerate(model.model.diffusion_model.loras):
-            if name == filename:
-                _del = i
-                break
-        if _del is not None:
-            model.model.diffusion_model.loras.pop(_del)
+    if dynamic_args.get("nunchaku", False):
         model.model.diffusion_model.loras.append((filename, strength_model))
-
         return model, clip
+
+    model_flag: str = type(model.model).__name__ if model is not None else "default"
 
     unet_keys = model_lora_keys_unet(model.model) if model is not None else {}
     clip_keys = model_lora_keys_clip(clip.cond_stage_model) if clip is not None else {}
@@ -134,6 +125,9 @@ def load_networks(names, te_multipliers=None, unet_multipliers=None, dyn_dims=No
     current_sd.current_lora_hash = compiled_lora_targets_hash
     current_sd.forge_objects.unet = current_sd.forge_objects_original.unet
     current_sd.forge_objects.clip = current_sd.forge_objects_original.clip
+
+    if dynamic_args.get("nunchaku", False):
+        current_sd.forge_objects.unet.model.diffusion_model.loras.clear()
 
     for filename, strength_model, strength_clip, online_mode in compiled_lora_targets:
         lora_sd = load_lora_state_dict(filename)
