@@ -58,7 +58,7 @@ class ForgeCanvas {
         this.imgY = 0;
         this.orgWidth = 0;
         this.orgHeight = 0;
-        this.imgScale = 1;
+        this.imgScale = 1.0;
         this.initial_height = initial_height;
 
         this.dragging = false;
@@ -182,6 +182,14 @@ class ForgeCanvas {
             drawingCanvas.style.opacity = "0.5";
         }
 
+        function resetScribble(e, rect) {
+            const indicatorSize = self.scribbleWidth * self.imgScale * 4;
+            scribbleIndicator.style.width = `${indicatorSize}px`;
+            scribbleIndicator.style.height = `${indicatorSize}px`;
+            scribbleIndicator.style.left = `${e.clientX - rect.left - indicatorSize / 2}px`;
+            scribbleIndicator.style.top = `${e.clientY - rect.top - indicatorSize / 2}px`;
+        }
+
         const resizeObserver = new ResizeObserver(() => {
             self.adjustInitialPositionAndScale();
             self.drawImage();
@@ -227,7 +235,7 @@ class ForgeCanvas {
         scribbleWidth.addEventListener("input", (e) => {
             self.scribbleWidth = e.target.value;
             scribbleWidthLabel.textContent = `Brush Width (${self.scribbleWidth})`;
-            const indicatorSize = self.scribbleWidth * 4;
+            const indicatorSize = self.scribbleWidth * self.imgScale * 4;
             scribbleIndicator.style.width = `${indicatorSize}px`;
             scribbleIndicator.style.height = `${indicatorSize}px`;
         });
@@ -257,9 +265,7 @@ class ForgeCanvas {
             if (self.drawing) self.handleDraw(e);
             if (self.img && !self.drawing && !self.dragging && !self.no_scribbles) {
                 const rect = container.getBoundingClientRect();
-                const indicatorSize = self.scribbleWidth * 2;
-                scribbleIndicator.style.left = `${e.clientX - rect.left - indicatorSize}px`;
-                scribbleIndicator.style.top = `${e.clientY - rect.top - indicatorSize}px`;
+                resetScribble(e, rect);
                 scribbleIndicator.style.display = "inline-block";
             }
         });
@@ -327,9 +333,7 @@ class ForgeCanvas {
                 scribbleWidth.value = parseInt(scribbleWidth.value) - Math.sign(e.deltaY) * 3;
                 updateInput(scribbleWidth);
                 const rect = container.getBoundingClientRect();
-                const indicatorSize = self.scribbleWidth * 2;
-                scribbleIndicator.style.left = `${e.clientX - rect.left - indicatorSize}px`;
-                scribbleIndicator.style.top = `${e.clientY - rect.top - indicatorSize}px`;
+                resetScribble(e, rect);
                 scale = false;
             }
             if (this._held_A) {
@@ -357,6 +361,7 @@ class ForgeCanvas {
             self.imgX = x - (x - self.imgX) * newScale;
             self.imgY = y - (y - self.imgY) * newScale;
             self.drawImage();
+            resetScribble(e, rect);
         });
 
         container.addEventListener("contextmenu", (e) => {
@@ -517,7 +522,7 @@ class ForgeCanvas {
 
         ctx.lineCap = "round";
         ctx.lineJoin = "round";
-        ctx.lineWidth = (this.scribbleWidth / this.imgScale) * 4;
+        ctx.lineWidth = this.scribbleWidth * 4;
 
         if (this.contrast_scribbles) {
             ctx.strokeStyle = this.contrast_pattern;
