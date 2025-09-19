@@ -197,8 +197,15 @@ class ControlNetForForgeOfficial(scripts.Script):
 
             using_a1111_data = False
 
-            unit_image = unit.image
+            if isinstance(unit.image, dict):  # backwards compatibility
+                unit_image = unit.image.get("image", None)
+                unit_mask_image = unit.image.get("mask", None)
+            else:
+                unit_image = unit.image
+                unit_mask_image = unit.mask_image
+
             unit_image_fg = unit.image_fg[:, :, 3] if unit.image_fg is not None else None
+            unit_mask_image_fg = unit.mask_image_fg[:, :, 3] if unit.mask_image_fg is not None else None
 
             if unit.use_preview_as_input and unit.generated_image is not None:
                 image = unit.generated_image
@@ -215,9 +222,6 @@ class ControlNetForForgeOfficial(scripts.Script):
                 raise ValueError("controlnet is enabled but no input image is given")
 
             image = HWC3(image)
-
-            unit_mask_image = unit.mask_image
-            unit_mask_image_fg = unit.mask_image_fg[:, :, 3] if unit.mask_image_fg is not None else None
 
             if using_a1111_data:
                 mask = HWC3(np.asarray(a1111_i2i_mask)) if a1111_i2i_mask is not None else None
