@@ -532,17 +532,18 @@ class ForgeCanvas {
 
         ctx.strokeStyle = this.scribbleColor;
 
-        if (this.scribbleAlpha <= 0) {
+        if (this.scribbleAlpha <= 0 || this.scribbleSoftness <= 0) {
             ctx.globalCompositeOperation = "destination-out";
-            ctx.globalAlpha = 1;
+            ctx.globalAlpha = 1.0;
             ctx.stroke();
-            return;
         }
+
+        if (this.scribbleAlpha <= 0) return;
 
         ctx.globalCompositeOperation = "source-over";
 
         if (this.scribbleSoftness <= 0) {
-            ctx.globalAlpha = this.scribbleAlpha / 100;
+            ctx.globalAlpha = this.scribbleAlpha / 100.0;
             ctx.stroke();
             return;
         }
