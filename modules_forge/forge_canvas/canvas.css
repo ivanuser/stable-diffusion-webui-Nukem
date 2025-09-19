@@ -3,6 +3,7 @@
     height: 512px;
     position: relative;
     overflow: hidden;
+    user-select: none;
 }
 
 .forge-image-container-plain {
@@ -168,10 +169,6 @@
     display: none;
     width: 80px;
     height: 80px;
-}
-
-.forge-no-select {
-    user-select: none;
 }
 
 .forge-upload-hint {
