@@ -118,6 +118,14 @@ def detect_unet_config(state_dict: dict, key_prefix: str):
             dit_config["guidance_embed"] = "{}guidance_in.in_layer.weight".format(key_prefix) in state_dict_keys
         return dit_config
 
+    if "{}txt_norm.weight".format(key_prefix) in state_dict_keys:  # Qwen Image
+        _qweight: bool = "{}transformer_blocks.0.attn.to_qkv.qweight".format(key_prefix) in state_dict_keys
+        dit_config = {"nunchaku": _qweight}
+        dit_config["image_model"] = "qwen_image"
+        dit_config["in_channels"] = state_dict["{}img_in.weight".format(key_prefix)].shape[1]
+        dit_config["num_layers"] = count_blocks(state_dict_keys, "{}transformer_blocks.".format(key_prefix) + "{}.")
+        return dit_config
+
     if "{}input_blocks.0.0.weight".format(key_prefix) not in state_dict_keys:
         return None
 

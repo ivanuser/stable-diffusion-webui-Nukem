@@ -344,7 +344,12 @@ def state_dict_parameters(sd):
     return module_mem
 
 
-def state_dict_dtype(state_dict):
+def state_dict_dtype(state_dict: dict):
+    if state_dict.pop("scaled_fp8", None) is not None:
+        return torch.float8_e4m3fn
+    if state_dict.pop("transformer.scaled_fp8", None) is not None:
+        return torch.float8_e4m3fn
+
     for k, v in state_dict.items():
         if hasattr(v, "gguf_cls"):
             return "gguf"
