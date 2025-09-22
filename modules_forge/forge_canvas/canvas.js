@@ -532,18 +532,25 @@ class ForgeCanvas {
 
         ctx.strokeStyle = this.scribbleColor;
 
-        if (this.scribbleAlpha <= 0 || this.scribbleSoftness <= 0) {
+        if (this.scribbleAlpha <= 0) {
             ctx.globalCompositeOperation = "destination-out";
             ctx.globalAlpha = 1.0;
             ctx.stroke();
+            return;
         }
-
-        if (this.scribbleAlpha <= 0) return;
 
         ctx.globalCompositeOperation = "source-over";
 
+        canvas.style.opacity = 1.0;
+        let drawingAlpha = this.scribbleAlpha;
+
+        if (this.scribbleAlphaFixed) {
+            canvas.style.opacity = this.scribbleAlpha / 100.0;
+            drawingAlpha = 100.0;
+        }
+
         if (this.scribbleSoftness <= 0) {
-            ctx.globalAlpha = this.scribbleAlpha / 100.0;
+            ctx.globalAlpha = drawingAlpha / 100.0;
             ctx.stroke();
             return;
         }
@@ -553,7 +560,7 @@ class ForgeCanvas {
         const steps = Math.round(5 + this.scribbleSoftness / 5);
         const stepWidth = (outerWidth - innerWidth) / (steps - 1);
 
-        ctx.globalAlpha = 1 - Math.pow(1 - Math.min(this.scribbleAlpha / 100, 0.95), 1 / steps);
+        ctx.globalAlpha = 1.0 - Math.pow(1.0 - Math.min(drawingAlpha / 100, 0.95), 1.0 / steps);
 
         for (let i = 0; i < steps; i++) {
             ctx.lineWidth = innerWidth + stepWidth * i;
