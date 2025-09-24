@@ -1,22 +1,15 @@
 import weakref
 
-import comfy.lora as lora_utils_comfyui
+from modules_forge.packages.comfy import lora as comfy_lora
 import torch
 
 from backend import memory_management, utils
 
 extra_weight_calculators = {}
-lora_collection_priority = [lora_utils_comfyui]
-
-
-def get_function(function_name: str):
-    for lora_collection in lora_collection_priority:
-        if hasattr(lora_collection, function_name):
-            return getattr(lora_collection, function_name)
 
 
 def load_lora(lora, to_load):
-    patch_dict, remaining_dict = get_function("load_lora")(lora, to_load)
+    patch_dict, remaining_dict = comfy_lora.load_lora(lora, to_load)
     return patch_dict, remaining_dict
 
 
@@ -25,7 +18,7 @@ def inner_str(k, prefix="", suffix=""):
 
 
 def model_lora_keys_clip(model, key_map={}):
-    model_keys, key_maps = get_function("model_lora_keys_clip")(model, key_map)
+    model_keys, key_maps = comfy_lora.model_lora_keys_clip(model, key_map)
 
     for model_key in model_keys:
         if model_key.endswith(".weight"):
@@ -40,10 +33,7 @@ def model_lora_keys_clip(model, key_map={}):
 
 
 def model_lora_keys_unet(model, key_map={}):
-    model_keys, key_maps = get_function("model_lora_keys_unet")(model, key_map)
-
-    # TODO: OFT
-
+    model_keys, key_maps = comfy_lora.model_lora_keys_unet(model, key_map)
     return key_maps
 
 
