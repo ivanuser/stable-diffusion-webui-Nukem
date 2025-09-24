@@ -22,7 +22,7 @@ The name "Forge" is inspired by "Minecraft Forge". This project aims to become t
 
 <br>
 
-## Features [Sep. 03]
+## Features [Sep. 24]
 > Most base features of the original [Automatic1111 Webui](https://github.com/AUTOMATIC1111/stable-diffusion-webui) should still function
 
 #### New Features
@@ -33,8 +33,10 @@ The name "Forge" is inspired by "Minecraft Forge". This project aims to become t
 > [!Important]
 > To export a video, you need to have **[FFmpeg](https://ffmpeg.org/)** installed
 
+- [X] Support [Qwen-Image](https://github.com/QwenLM/Qwen-Image)
+    - **not** `qwen-image-edit`
 - [X] Support [Nunchaku](https://github.com/nunchaku-tech/nunchaku) (`SVDQ`) Models
-    - `dev`, `krea`, `kontext`, `t5`
+    - `dev`, `krea`, `kontext`, `qwen-image`, `t5`
 - [X] Support [Flux Kontext](https://huggingface.co/black-forest-labs/FLUX.1-Kontext-dev)
     - `img2img`, `inpaint`
 
@@ -71,7 +73,6 @@ The name "Forge" is inspired by "Minecraft Forge". This project aims to become t
 
 - [ ] Improve Memory Management during Generation
     - currently, even when using the same models you could run in [ComfyUI](https://github.com/comfyanonymous/ComfyUI), you might still get **Out of Memory** error...
-- [ ] Support [Qwen-Image](https://huggingface.co/Qwen/Qwen-Image)
 
 #### Removed Features
 
@@ -99,6 +100,10 @@ The name "Forge" is inspired by "Minecraft Forge". This project aims to become t
 - [X] Fix some typos
 - [X] Remove redundant upscaler codes
     - put every upscaler inside the `ESRGAN` folder
+- [X] Improve `ForgeCanvas`
+    - hotkeys
+    - brush adjustments
+    - deobfuscate
 - [X] Optimize upscaler logics
 - [X] Optimize certain operations in `Spandrel`
 - [X] Improve color correction
