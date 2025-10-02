@@ -508,9 +508,22 @@ def preprocess_state_dict(sd):
 
 
 def split_state_dict(sd, additional_state_dicts: list = None):
-    sd = load_torch_file(sd)
+    sd, metadata = load_torch_file(sd, return_metadata=True)
     sd = preprocess_state_dict(sd)
     guess = huggingface_guess.guess(sd)
+
+    if "Qwen" in guess.huggingface_repo and getattr(guess, "nunchaku", False):
+        import json
+
+        from nunchaku.utils import get_precision_from_quantization_config
+
+        quantization_config = json.loads(metadata["quantization_config"])
+        guess.unet_config.update(
+            {
+                "precision": get_precision_from_quantization_config(quantization_config),
+                "rank": quantization_config.get("rank", 32),
+            }
+        )
 
     if isinstance(additional_state_dicts, list):
         for asd in additional_state_dicts:
