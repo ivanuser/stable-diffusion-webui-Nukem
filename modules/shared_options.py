@@ -222,7 +222,6 @@ options_templates.update(
             "CLIP_stop_at_last_layers": OptionInfo(1, "Clip Skip", gr.Slider, {"minimum": 1, "maximum": 12, "step": 1}, infotext="Clip skip").link("wiki", "https://github.com/AUTOMATIC1111/stable-diffusion-webui/wiki/Features#clip-skip").info("1 = disable, 2 = skip one layer, etc."),
             "comma_padding_backtrack": OptionInfo(16, "Token Wrap Length", gr.Slider, {"minimum": 0, "maximum": 74, "step": 1}).info("for prompts shorter than the threshold, move them to the next chunk of 75 tokens if they do not fit inside the current chunk"),
             "tiling": OptionInfo(False, "Tiling", infotext="Tiling").info("produce a tileable image"),
-            "hires_fix_refiner_pass": OptionInfo("second pass", "Which pass during Hires. fix to enable Refiner", gr.Radio, {"choices": ("first pass", "second pass", "both passes")}, infotext="Hires refiner"),
             "randn_source": OptionInfo("CPU", "Random Number Generator", gr.Radio, {"choices": ("CPU", "GPU", "NV")}, infotext="RNG").info("use <b>CPU</b> for the maximum recreatability across different systems"),
             "divxl": OptionDiv(),
             "sdxl_crop_top": OptionInfo(0, "[SDXL] Crop-Top Coordinate"),
