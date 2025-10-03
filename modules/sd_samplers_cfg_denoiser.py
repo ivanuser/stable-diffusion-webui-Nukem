@@ -54,7 +54,6 @@ class CFGDenoiser(torch.nn.Module):
         self.padded_cond_uncond = False
         self.padded_cond_uncond_v0 = False
         self.sampler = sampler
-        self.model_wrap = None
         self.p = None
 
         self.need_last_noise_uncond = False

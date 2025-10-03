@@ -180,6 +180,8 @@ def apply_refiner(cfg_denoiser, x, sigma):
     if not checkpoint_changed:
         return False
 
+    del cfg_denoiser.model_wrap
+
     try:
         main_entry.refresh_model_loading_parameters()
         sd_models.forge_model_reload()
