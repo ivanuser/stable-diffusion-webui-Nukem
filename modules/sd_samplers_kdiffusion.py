@@ -1,6 +1,7 @@
 import inspect
 
 import k_diffusion
+import k_diffusion.external
 import torch
 
 import modules.shared as shared
@@ -17,6 +18,7 @@ samplers_k_diffusion = [
     ("DPM++ 3M SDE", "sample_dpmpp_3m_sde", ["k_dpmpp_3m_sde"], {"scheduler": "exponential", "discard_next_to_last_sigma": True, "brownian_noise": True}),
     ("Euler a", "sample_euler_ancestral", ["k_euler_a", "k_euler_ancestral"], {"uses_ensd": True}),
     ("Euler", "sample_euler", ["k_euler"], {}),
+    ("LCM", "sample_lcm", ["k_lcm"], {}),
     ("LMS", "sample_lms", ["k_lms"], {}),
     ("Heun", "sample_heun", ["k_heun"], {"second_order": True}),
     ("DPM2", "sample_dpm_2", ["k_dpm_2"], {"scheduler": "karras", "discard_next_to_last_sigma": True, "second_order": True}),
