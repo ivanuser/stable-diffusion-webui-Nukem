@@ -5,7 +5,12 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from backend.attention import attention_function
+from backend.memory_management import xformers_enabled
+
+if xformers_enabled():
+    from backend.attention import attention_xformers as attention_function
+else:
+    from backend.attention import attention_pytorch as attention_function
 
 
 def process_qwen2vl_images(
