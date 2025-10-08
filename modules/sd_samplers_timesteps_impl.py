@@ -39,11 +39,6 @@ def ddim(model, x, timesteps, extra_args=None, callback=None, disable=None, eta=
 
 
 @torch.no_grad()
-def ddim_cfgpp(model, x, timesteps, extra_args=None, callback=None, disable=None, eta=0.0):
-    raise NotImplementedError()
-
-
-@torch.no_grad()
 def plms(model, x, timesteps, extra_args=None, callback=None, disable=None):
     alphas_cumprod = model.inner_model.inner_model.alphas_cumprod
     alphas = alphas_cumprod[timesteps]
