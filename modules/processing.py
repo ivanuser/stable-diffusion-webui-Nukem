@@ -34,6 +34,7 @@ from modules.sd_models import apply_token_merging, forge_model_reload
 from modules_forge.utils import apply_circular_forge
 from modules_forge import main_entry
 from backend import memory_management
+from backend.args import dynamic_args
 from backend.modules.k_prediction import rescale_zero_terminal_snr_sigmas
 
 
@@ -1168,6 +1169,7 @@ def process_images_inner(p: StableDiffusionProcessing) -> Processed:
     if p.scripts is not None:
         p.scripts.postprocess(p, res)
 
+    dynamic_args.pop("ref_latents", None)
     return res
 
 

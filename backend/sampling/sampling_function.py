@@ -369,7 +369,7 @@ def sampling_function(self, denoiser_params, cond_scale, cond_composition, extra
 
 def sampling_prepare(unet: "UnetPatcher", x: torch.Tensor, *, is_img2img: bool = False):
     if is_img2img and dynamic_args.get("kontext", False):
-        unet.set_transformer_option("ref_latents", [x.detach().clone()])
+        unet.set_transformer_option("ref_latents", x.detach().clone())
     else:
         unet.set_transformer_option("ref_latents", None)
 

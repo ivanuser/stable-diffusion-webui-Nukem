@@ -18,6 +18,7 @@ from nunchaku.models.utils import CPUOffloadManager
 from nunchaku.ops.fused import fused_gelu_mlp
 from nunchaku.utils import load_state_dict_in_safetensors
 
+from backend.args import dynamic_args
 from backend.utils import process_img
 from modules import shared
 
@@ -63,7 +64,12 @@ class SVDQFluxTransformer2DModel(nn.Module):
         img, img_ids = process_img(x)
         img_tokens = img.shape[1]
 
-        ref_latents = transformer_options.get("ref_latents", None)
+        ref_latents = []
+        if transformer_options.get("ref_latents", None) is not None:
+            ref_latents.append(transformer_options["ref_latents"])
+        if dynamic_args.get("ref_latents", None) is not None:
+            ref_latents.append(dynamic_args["ref_latents"])
+
         if ref_latents is not None:
             h = 0
             w = 0
