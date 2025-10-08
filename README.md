@@ -22,13 +22,15 @@ The name "Forge" is inspired by "Minecraft Forge". This project aims to become t
 
 <br>
 
-## Features [Sep. 24]
+## Features [Oct. 08]
 > Most base features of the original [Automatic1111 Webui](https://github.com/AUTOMATIC1111/stable-diffusion-webui) should still function
 
 #### New Features
 
 - [X] Support [Wan 2.2](https://github.com/Wan-Video/Wan2.2)
     - `txt2img`, `img2img`, `txt2vid`, `img2vid`
+    - use `Refiner` to achieve **High Noise** / **Low Noise** switching
+        - enable `Refiner` in **Settings/UI Alternatives**
 
 > [!Important]
 > To export a video, you need to have **[FFmpeg](https://ffmpeg.org/)** installed
@@ -39,6 +41,7 @@ The name "Forge" is inspired by "Minecraft Forge". This project aims to become t
     - `dev`, `krea`, `kontext`, `qwen-image`, `t5`
 - [X] Support [Flux Kontext](https://huggingface.co/black-forest-labs/FLUX.1-Kontext-dev)
     - `img2img`, `inpaint`
+    - support multi-image inputs
 
 > [!Note]
 > Since the `state_dict` between **Flux-Dev**, **Flux-Krea**, and **Flux-Kontext** are exactly the same, to be properly detected as a **Kontext** model, the model needs to include "`kontext`" in its path, either the file or folder name.
@@ -46,7 +49,7 @@ The name "Forge" is inspired by "Minecraft Forge". This project aims to become t
 - [X] Support [Chroma](https://huggingface.co/lodestones/Chroma)
     - special thanks: [@croquelois](https://github.com/lllyasviel/stable-diffusion-webui-forge/pull/2925)
 - [X] Rewrite Preset System
-    - now actually remember the checkpoint/modules selections for each preset
+    - now actually remembers the checkpoint/module selection for each preset
 - [X] Support [uv](https://github.com/astral-sh/uv) package manager
     - requires **manually** installing [uv](https://github.com/astral-sh/uv/releases)
     - drastically speed up installation
@@ -69,11 +72,6 @@ The name "Forge" is inspired by "Minecraft Forge". This project aims to become t
 - [X] Add `pillow-heif` package
     - support `.avif` and `.heif` images
 
-#### TODO
-
-- [ ] Improve Memory Management during Generation
-    - currently, even when using the same models you could run in [ComfyUI](https://github.com/comfyanonymous/ComfyUI), you might still get **Out of Memory** error...
-
 #### Removed Features
 
 - [X] SD2
@@ -93,6 +91,7 @@ The name "Forge" is inspired by "Minecraft Forge". This project aims to become t
 #### Optimizations
 
 - [X] No longer `git` `clone` any repository on fresh install
+- [X] Fix memory leak when switching checkpoints
 - [X] Remove unused `cmd_args`
 - [X] Remove unused `args_parser`
 - [X] Remove unused `shared_options`
@@ -106,7 +105,9 @@ The name "Forge" is inspired by "Minecraft Forge". This project aims to become t
     - deobfuscate
 - [X] Optimize upscaler logics
 - [X] Optimize certain operations in `Spandrel`
+- [X] Improve memory management
 - [X] Improve color correction
+- [X] Update the implementation for `uni_pc` and `LCM` samplers
 - [X] Revamp settings
     - improve formatting
     - update descriptions
@@ -193,6 +194,23 @@ The name "Forge" is inspired by "Minecraft Forge". This project aims to become t
 - `--flash`: Install the `flash_attn` package to speed up generation
 - `--fast-fp16`: Enable the `allow_fp16_accumulation` option
     - requires PyTorch **2.7.0** +
+
+<details>
+<summary>with SageAttention 2</summary>
+
+- `--sage2-function`: Select the function used by **SageAttention 2**
+    - **options:**
+        - `auto` (default)
+        - `fp16_triton`
+        - `fp16_cuda`
+        - `fp8_cuda`
+
+- If you are getting `NaN` errors, try:
+```bash
+--sage2-function fp16_cuda --sage-quant-gran per_warp --sage-accum-dtype fp16+fp32
+```
+
+</details>
 
 <br>
 
