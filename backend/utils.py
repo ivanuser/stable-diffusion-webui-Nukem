@@ -237,3 +237,20 @@ def process_img(x, index=0, h_offset=0, w_offset=0):
     img_ids[:, :, 1] = img_ids[:, :, 1] + torch.linspace(h_offset, h_len - 1 + h_offset, steps=h_len, device=x.device, dtype=x.dtype).unsqueeze(1)
     img_ids[:, :, 2] = img_ids[:, :, 2] + torch.linspace(w_offset, w_len - 1 + w_offset, steps=w_len, device=x.device, dtype=x.dtype).unsqueeze(0)
     return img, repeat(img_ids, "h w c -> b (h w) c", b=bs)
+
+
+def join_dicts(base_dict: dict | None, update_dict: dict | None) -> dict:
+    if not update_dict:
+        return (base_dict or {}).copy()
+
+    result = (base_dict or {}).copy()
+
+    for key, value in update_dict.items():
+        if key in result and isinstance(result[key], dict) and isinstance(value, dict):
+            result[key] = join_dicts(result[key], value)
+        elif key in result and isinstance(result[key], list) and isinstance(value, list):
+            result[key] = result[key] + value
+        else:
+            result[key] = value
+
+    return result

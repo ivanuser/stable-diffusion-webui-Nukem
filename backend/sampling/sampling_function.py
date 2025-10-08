@@ -337,8 +337,7 @@ def sampling_function(self, denoiser_params, cond_scale, cond_composition, extra
     timestep = denoiser_params.sigma
     uncond = compile_conditions(denoiser_params.text_uncond)
     cond = compile_weighted_conditions(denoiser_params.text_cond, cond_composition)
-    model_options = (unet_patcher.model_options or {}).copy()
-    model_options.update(extra_model_options or {})
+    model_options = utils.join_dicts(unet_patcher.model_options, extra_model_options)
     seed = self.p.seeds[0]
 
     if extra_concat_condition is not None:
