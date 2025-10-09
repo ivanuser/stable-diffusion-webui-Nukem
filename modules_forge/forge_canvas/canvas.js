@@ -41,6 +41,7 @@ class ForgeCanvas {
         scribbleColorFixed = false,
         scribbleWidth = 20,
         scribbleWidthFixed = false,
+        scribbleWidthConsistent = false,
         scribbleAlpha = 100,
         scribbleAlphaFixed = false,
         scribbleSoftness = 0,
@@ -71,6 +72,7 @@ class ForgeCanvas {
         this.scribbleColorFixed = scribbleColorFixed;
         this.scribbleWidth = scribbleWidth;
         this.scribbleWidthFixed = scribbleWidthFixed;
+        this.scribbleWidthConsistent = scribbleWidthConsistent;
         this.scribbleAlpha = scribbleAlpha;
         this.scribbleAlphaFixed = scribbleAlphaFixed;
         this.scribbleSoftness = scribbleSoftness;
@@ -183,7 +185,7 @@ class ForgeCanvas {
         }
 
         function resetScribble(e, rect) {
-            const indicatorSize = self.scribbleWidth * self.imgScale * 4;
+            const indicatorSize = self.scribbleWidth * (self.scribbleWidthConsistent ? 1.0 : self.imgScale) * 4;
             scribbleIndicator.style.width = `${indicatorSize}px`;
             scribbleIndicator.style.height = `${indicatorSize}px`;
             scribbleIndicator.style.left = `${e.clientX - rect.left - indicatorSize / 2}px`;
@@ -235,7 +237,7 @@ class ForgeCanvas {
         scribbleWidth.addEventListener("input", (e) => {
             self.scribbleWidth = e.target.value;
             scribbleWidthLabel.textContent = `Brush Width (${self.scribbleWidth})`;
-            const indicatorSize = self.scribbleWidth * self.imgScale * 4;
+            const indicatorSize = self.scribbleWidth * (self.scribbleWidthConsistent ? 1.0 : self.imgScale) * 4;
             scribbleIndicator.style.width = `${indicatorSize}px`;
             scribbleIndicator.style.height = `${indicatorSize}px`;
         });
@@ -370,11 +372,6 @@ class ForgeCanvas {
             return false;
         });
 
-        container.addEventListener("pointerover", () => {
-            toolbar.style.opacity = "1";
-            if (!self.img && !self.no_upload) container.style.cursor = "pointer";
-        });
-
         container.addEventListener("dragleave", () => {
             toolbar.style.opacity = "0";
             imageContainer.style.cursor = "";
@@ -437,10 +434,13 @@ class ForgeCanvas {
 
         container.addEventListener("pointerenter", () => {
             self.pointerInsideContainer = true;
+            toolbar.style.opacity = "1";
+            if (!self.img && !self.no_upload) container.style.cursor = "pointer";
         });
 
         container.addEventListener("pointerleave", () => {
             self.pointerInsideContainer = false;
+            toolbar.style.opacity = "0";
         });
 
         document.addEventListener("paste", (e) => {
@@ -522,7 +522,7 @@ class ForgeCanvas {
 
         ctx.lineCap = "round";
         ctx.lineJoin = "round";
-        ctx.lineWidth = this.scribbleWidth * 4;
+        ctx.lineWidth = this.scribbleWidth / (this.scribbleWidthConsistent ? this.imgScale : 1.0) * 4;
 
         if (this.contrast_scribbles) {
             ctx.strokeStyle = this.contrast_pattern;
