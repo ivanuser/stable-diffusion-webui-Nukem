@@ -97,3 +97,6 @@ def initialize_forge():
     modules_forge.patch_basic.patch_all_basics()
 
     fix_logging()
+
+    from backend.huggingface import process
+    process()
