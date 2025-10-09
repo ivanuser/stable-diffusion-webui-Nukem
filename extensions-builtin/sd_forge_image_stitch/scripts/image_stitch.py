@@ -22,11 +22,12 @@ Use in <b>txt2img</b> to achieve the effect of EmptySD3LatentImage with custom r
 i2i_info = """
 For <b>Flux-Kontext</b> Only<br>
 Use in <b>img2img</b> to achieve the effect of 2 input images<br>
-<b>NOTE:</b> This doesn't actually stitch the images. So use "1st/2nd" instead of "left/right" in prompts
+<b>NOTE:</b> This doesn't actually stitch the images, so use "1st/2nd" instead of "left/right" in prompts
 """
 
 
 class ImageStitch(scripts.Script):
+    sorting_priority = 529
 
     def title(self):
         return "ImageStitch Integrated"
@@ -47,13 +48,14 @@ class ImageStitch(scripts.Script):
                 show_download_button=False,
                 show_share_button=False,
                 label="Reference Latents",
-                width=512,
-                height=512,
+                width=384,
+                height=384,
+                elem_id=self.elem_id("ref_latent"),
             )
 
         return [img]
 
-    def process(self, p: "StableDiffusionProcessing", reference: "Image.Image", *args):
+    def process(self, p: "StableDiffusionProcessing", reference: "Image.Image"):
         if reference is None:
             return
         if not dynamic_args.get("kontext", False):
