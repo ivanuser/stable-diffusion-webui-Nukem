@@ -305,7 +305,7 @@ def on_preset_change(preset: str):
 
     show_clip_skip = preset not in ("qwen", "wan")
     show_basic_mem = preset != "sd"
-    show_adv_mem = preset in ("flux", "qwem", "wan")
+    show_adv_mem = preset in ("flux", "qwen", "wan")
     distilled = preset in ("flux", "wan")
     d_label = "Distilled CFG Scale" if preset == "flux" else "Shift"
     batch_args = {"minimum": 1, "maximum": 97, "step": 16, "label": "Frames", "value": 1} if preset == "wan" else {"minimum": 1, "maximum": 8, "step": 1, "label": "Batch size", "value": 1}
