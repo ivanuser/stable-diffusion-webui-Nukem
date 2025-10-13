@@ -484,8 +484,6 @@ def build_module_profile(model, model_gpu_memory_when_using_cpu_swap):
 class LoadedModel:
     def __init__(self, model: ModelPatcher):
         self.model = model
-        self.real_model = None
-        self.model_finalizer = None
         self.model_accelerated = False
         self.device = model.load_device
         self.inclusive_memory = 0
@@ -506,7 +504,7 @@ class LoadedModel:
         self.model.model_patches_to(self.model.model_dtype())
 
         try:
-            real_model = self.model.forge_patch_model(patch_model_to)
+            self.real_model = self.model.forge_patch_model(patch_model_to)
             self.model.current_device = self.model.load_device
         except Exception as e:
             self.model.forge_unpatch_model(self.model.offload_device)
@@ -514,7 +512,7 @@ class LoadedModel:
             raise e
 
         if not do_not_need_cpu_swap:
-            gpu_modules, gpu_modules_only_extras, cpu_modules = build_module_profile(real_model, model_gpu_memory_when_using_cpu_swap)
+            gpu_modules, gpu_modules_only_extras, cpu_modules = build_module_profile(self.real_model, model_gpu_memory_when_using_cpu_swap)
             pin_memory = PIN_SHARED_MEMORY and is_device_cpu(self.model.offload_device)
 
             mem_counter = 0
@@ -553,20 +551,18 @@ class LoadedModel:
             global signal_empty_cache
             signal_empty_cache = True
 
-        bake_gguf_model(real_model)
+        bake_gguf_model(self.real_model)
 
         self.model.refresh_loras()
 
         if is_intel_xpu() and not args.disable_ipex_hijack:
-            real_model = torch.xpu.optimize(real_model.eval(), inplace=True, auto_kernel_selection=True, graph_mode=True)
+            self.real_model = torch.xpu.optimize(self.real_model.eval(), inplace=True, auto_kernel_selection=True, graph_mode=True)
 
-        self.real_model = weakref.ref(real_model)
-        self.model_finalizer = weakref.finalize(real_model, cleanup_models)
-        return real_model
+        return self.real_model
 
     def model_unload(self, avoid_model_moving=False):
         if self.model_accelerated:
-            for m in self.real_model().modules():
+            for m in self.real_model.modules():
                 if hasattr(m, "prev_parameters_manual_cast"):
                     m.parameters_manual_cast = m.prev_parameters_manual_cast
                     del m.prev_parameters_manual_cast
@@ -578,10 +574,6 @@ class LoadedModel:
         else:
             self.model.forge_unpatch_model(self.model.offload_device)
             self.model.model_patches_to(self.model.offload_device)
-
-        self.model_finalizer.detach()
-        self.model_finalizer = None
-        self.real_model = None
 
     def __eq__(self, other: "LoadedModel"):
         return self.model is other.model
