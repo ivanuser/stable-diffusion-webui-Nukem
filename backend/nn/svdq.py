@@ -22,6 +22,25 @@ from backend.args import dynamic_args
 from backend.utils import process_img
 from modules import shared
 
+
+class NunchakuModelMixin:
+    offload: bool = False
+
+    def set_offload(self, offload: bool, use_pin_memory: bool, num_blocks_on_gpu: int):
+        raise NotImplementedError
+
+    def to(self, *args, **kwargs):
+        args = (arg for arg in args if not isinstance(arg, torch.dtype))
+        kwargs.pop("dtype", None)
+
+        dev: bool = any(isinstance(arg, torch.device) for arg in args) or "device" in kwargs
+
+        if self.offload and dev:
+            return self
+        else:
+            return super().to(*args, **kwargs)
+
+
 # ========== Flux ========== #
 
 
@@ -495,7 +514,7 @@ class NunchakuQwenImageTransformerBlock(nn.Module):
         return encoder_hidden_states, hidden_states
 
 
-class NunchakuQwenImageTransformer2DModel(QwenImageTransformer2DModel):
+class NunchakuQwenImageTransformer2DModel(NunchakuModelMixin, QwenImageTransformer2DModel):
     """https://github.com/nunchaku-tech/ComfyUI-nunchaku/blob/v1.0.1/models/qwenimage.py"""
 
     def __init__(
@@ -552,8 +571,6 @@ class NunchakuQwenImageTransformer2DModel(QwenImageTransformer2DModel):
             patch_size * patch_size * self.out_channels,
             bias=True,
         )
-
-        self.offload = False
 
         self.set_offload(
             offload=shared.opts.svdq_cpu_offload,
@@ -722,14 +739,3 @@ class NunchakuQwenImageTransformer2DModel(QwenImageTransformer2DModel):
             self.offload_manager = None
             gc.collect()
             torch.cuda.empty_cache()
-
-    def to(self, *args, **kwargs):
-        args = (arg for arg in args if not isinstance(arg, torch.dtype))
-        kwargs.pop("dtype", None)
-
-        dev: bool = any(isinstance(arg, torch.device) for arg in args) or "device" in kwargs
-
-        if self.offload and dev:
-            return self
-        else:
-            return super().to(*args, **kwargs)
