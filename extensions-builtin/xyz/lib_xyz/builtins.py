@@ -10,7 +10,6 @@ from .axis_application import (
     apply_prompt,
     apply_size,
     apply_styles,
-    apply_uni_pc_order,
     apply_vae,
     do_nothing,
 )
@@ -81,6 +80,5 @@ if shared.cmd_opts.adv_samplers:
             AxisOption("Schedule max sigma", float, apply_override("sigma_max")),
             AxisOption("Schedule rho", float, apply_override("rho")),
             AxisOption("Eta", float, apply_field("eta")),
-            AxisOption("UniPC Order", int, apply_uni_pc_order, cost=0.5),
         ]
     )

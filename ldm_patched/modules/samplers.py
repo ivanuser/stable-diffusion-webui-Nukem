@@ -8,7 +8,6 @@ import math
 import torch
 from ldm_patched.k_diffusion import sampling as k_diffusion_sampling
 from ldm_patched.modules import model_management
-from ldm_patched.unipc import uni_pc
 
 
 def get_area_and_mult(conds, x_in, timestep_in):
@@ -716,57 +715,6 @@ class Sampler:
         return math.isclose(max_sigma, sigma, rel_tol=1e-05) or sigma > max_sigma
 
 
-class UNIPC(Sampler):
-    def sample(
-        self,
-        model_wrap,
-        sigmas,
-        extra_args,
-        callback,
-        noise,
-        latent_image=None,
-        denoise_mask=None,
-        disable_pbar=False,
-    ):
-        return uni_pc.sample_unipc(
-            model_wrap,
-            noise,
-            latent_image,
-            sigmas,
-            max_denoise=self.max_denoise(model_wrap, sigmas),
-            extra_args=extra_args,
-            noise_mask=denoise_mask,
-            callback=callback,
-            disable=disable_pbar,
-        )
-
-
-class UNIPCBH2(Sampler):
-    def sample(
-        self,
-        model_wrap,
-        sigmas,
-        extra_args,
-        callback,
-        noise,
-        latent_image=None,
-        denoise_mask=None,
-        disable_pbar=False,
-    ):
-        return uni_pc.sample_unipc(
-            model_wrap,
-            noise,
-            latent_image,
-            sigmas,
-            max_denoise=self.max_denoise(model_wrap, sigmas),
-            extra_args=extra_args,
-            noise_mask=denoise_mask,
-            callback=callback,
-            variant="bh2",
-            disable=disable_pbar,
-        )
-
-
 KSAMPLER_NAMES = [
     "euler",
     "euler_ancestral",
@@ -998,7 +946,7 @@ SCHEDULER_NAMES = [
     "simple",
     "ddim_uniform",
 ]
-SAMPLER_NAMES = KSAMPLER_NAMES + ["ddim", "uni_pc", "uni_pc_bh2"]
+SAMPLER_NAMES = KSAMPLER_NAMES + ["ddim"]
 
 
 def calculate_sigmas_scheduler(model, scheduler_name, steps):
@@ -1028,11 +976,7 @@ def calculate_sigmas_scheduler(model, scheduler_name, steps):
 
 
 def sampler_object(name):
-    if name == "uni_pc":
-        sampler = UNIPC()
-    elif name == "uni_pc_bh2":
-        sampler = UNIPCBH2()
-    elif name == "ddim":
+    if name == "ddim":
         sampler = ksampler("euler", inpaint_options={"random": True})
     else:
         sampler = ksampler(name)
@@ -1069,7 +1013,7 @@ class KSampler:
         sigmas = None
 
         discard_penultimate_sigma = False
-        if self.sampler in ["dpm_2", "dpm_2_ancestral", "uni_pc", "uni_pc_bh2"]:
+        if self.sampler in ["dpm_2", "dpm_2_ancestral"]:
             steps += 1
             discard_penultimate_sigma = True
 

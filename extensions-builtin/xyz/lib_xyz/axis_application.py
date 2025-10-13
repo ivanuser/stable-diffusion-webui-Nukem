@@ -71,10 +71,6 @@ def apply_styles(p: StableDiffusionProcessing, x: str, _):
     p.styles.extend(x.split(","))
 
 
-def apply_uni_pc_order(p, x, xs):
-    opts.data["uni_pc_order"] = min(x, p.steps - 1)
-
-
 def apply_face_restore(p, opt, x):
     opt = opt.lower()
     if opt == "codeformer":
