@@ -2,7 +2,6 @@
 
 import platform
 import time
-import weakref
 from enum import Enum
 
 import psutil
@@ -651,13 +650,13 @@ def compute_model_gpu_memory_when_using_cpu_swap(current_free_mem, inference_mem
 
 
 def load_models_gpu(models, memory_required=0, hard_memory_preservation=0):
-    global vram_state
-
     execution_start_time = time.perf_counter()
-    memory_for_inference = max(minimum_inference_memory(), memory_required) + hard_memory_preservation
+    memory_for_inference = minimum_inference_memory()
+    memory_to_free = max(memory_for_inference, max(memory_required, hard_memory_preservation) + EXTRA_RESERVED_VRAM)
 
-    models_to_load = []
-    models_already_loaded = []
+    models_to_load: list[LoadedModel] = []
+    models_already_loaded: list[LoadedModel] = []
+
     for x in models:
         load_model = LoadedModel(x)
 
@@ -674,7 +673,7 @@ def load_models_gpu(models, memory_required=0, hard_memory_preservation=0):
         devs = set(map(lambda a: a.device, models_already_loaded))
         for d in devs:
             if d != torch.device("cpu"):
-                free_memory(memory_for_inference, d, models_already_loaded)
+                free_memory(memory_to_free, d, models_already_loaded)
 
         if (moving_time := time.perf_counter() - execution_start_time) > 0.1:
             print(f"Memory cleanup has taken {moving_time:.2f} seconds")
@@ -687,11 +686,17 @@ def load_models_gpu(models, memory_required=0, hard_memory_preservation=0):
     total_memory_required = {}
     for loaded_model in models_to_load:
         loaded_model.compute_inclusive_exclusive_memory()
-        total_memory_required[loaded_model.device] = total_memory_required.get(loaded_model.device, 0) + loaded_model.exclusive_memory + loaded_model.inclusive_memory * 0.25
+        total_memory_required[loaded_model.device] = total_memory_required.get(loaded_model.device, 0) + loaded_model.exclusive_memory
 
     for device in total_memory_required:
         if device != torch.device("cpu"):
-            free_memory(total_memory_required[device] * 1.3 + memory_for_inference, device, models_already_loaded)
+            free_memory(total_memory_required[device] * 1.2 + memory_to_free, device, models_already_loaded)
+
+    for device in total_memory_required:
+        if device != torch.device("cpu"):
+            free_mem = get_free_memory(device)
+            if free_mem < memory_for_inference:
+                free_memory(memory_for_inference, device)
 
     for loaded_model in models_to_load:
         model = loaded_model.model
