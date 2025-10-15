@@ -205,3 +205,6 @@ class NunchakuPatcher(UnetPatcher):
     def forge_unpatch_model(self, target_device=None):
         if target_device is not None:
             self.model.diffusion_model.to(target_device)
+
+    def to_load_list(self):
+        return []
