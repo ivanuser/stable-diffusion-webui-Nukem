@@ -424,42 +424,34 @@ def module_move(module, device, recursive=True, excluded_patterns=[]):
     return module
 
 
-def build_module_profile(model, model_gpu_memory_when_using_cpu_swap):
+def build_module_profile(model: ModelPatcher, swap_memory):
     all_modules = []
-    legacy_modules = []
+    gpu_modules = []
+    extras_modules = []
+    mem_counter = 0
 
-    for m in model.modules():
+    for m in model.to_load_list():
         if hasattr(m, "parameters_manual_cast"):
             m.total_mem, m.weight_mem, m.extra_mem = module_size(m, return_split=True)
             all_modules.append(m)
-        elif hasattr(m, "weight"):
+        else:
             m.total_mem, m.weight_mem, m.extra_mem = module_size(m, return_split=True)
-            legacy_modules.append(m)
+            gpu_modules.append(m)
+            mem_counter += m.total_mem
 
-    gpu_modules = []
-    gpu_modules_only_extras = []
-    mem_counter = 0
-
-    for m in legacy_modules.copy():
-        gpu_modules.append(m)
-        legacy_modules.remove(m)
-        mem_counter += m.total_mem
-
-    for m in sorted(all_modules, key=lambda x: x.extra_mem).copy():
-        if mem_counter + m.extra_mem < model_gpu_memory_when_using_cpu_swap:
-            gpu_modules_only_extras.append(m)
+    for m in sorted(all_modules.copy(), key=lambda x: x.extra_mem):
+        if mem_counter + m.extra_mem < swap_memory:
             all_modules.remove(m)
+            extras_modules.append(m)
             mem_counter += m.extra_mem
 
-    cpu_modules = all_modules
+    # for m in sorted(extras_modules.copy(), key=lambda x: x.weight_mem):
+    #     if mem_counter + m.weight_mem < swap_memory:
+    #         extras_modules.remove(m)
+    #         gpu_modules.append(m)
+    #         mem_counter += m.weight_mem
 
-    for m in sorted(gpu_modules_only_extras, key=lambda x: x.weight_mem).copy():
-        if mem_counter + m.weight_mem < model_gpu_memory_when_using_cpu_swap:
-            gpu_modules.append(m)
-            gpu_modules_only_extras.remove(m)
-            mem_counter += m.weight_mem
-
-    return gpu_modules, gpu_modules_only_extras, cpu_modules
+    return gpu_modules, extras_modules, all_modules
 
 
 class LoadedModel:
@@ -493,7 +485,7 @@ class LoadedModel:
             raise e
 
         if not full_load:
-            gpu_modules, gpu_modules_only_extras, cpu_modules = build_module_profile(self.real_model, cpu_swap_memory)
+            gpu_modules, gpu_modules_only_extras, cpu_modules = build_module_profile(self.model, cpu_swap_memory)
             pin_memory = PIN_SHARED_MEMORY and is_device_cpu(self.model.offload_device)
 
             mem_counter = 0
@@ -623,12 +615,10 @@ def free_memory(memory_required, device, keep_loaded=[], free_all=False):
     print("Done.")
 
 
-def compute_model_gpu_memory_when_using_cpu_swap(current_free_mem, inference_memory):
-    maximum_memory_available = current_free_mem - inference_memory
-
-    suggestion = max(maximum_memory_available / 1.3, maximum_memory_available - 1024 * 1024 * 1024 * 1.25)
-
-    return int(max(0, suggestion))
+def compute_memory_for_cpu_swap(current_free_mem, inference_memory, previously_loaded):
+    maximum_memory_available = current_free_mem + previously_loaded - inference_memory
+    suggestion = max(maximum_memory_available / 1.2, maximum_memory_available - EXTRA_RESERVED_VRAM)
+    return int(max(0, suggestion - previously_loaded))
 
 
 def load_models_gpu(models, memory_required=0, hard_memory_preservation=0):
@@ -700,10 +690,7 @@ def load_models_gpu(models, memory_required=0, hard_memory_preservation=0):
 
             if estimated_remaining_memory < 0:
                 vram_set_state = VRAMState.LOW_VRAM
-                if previously_loaded > 0:
-                    cpu_swap_memory = previously_loaded
-                else:
-                    cpu_swap_memory = compute_model_gpu_memory_when_using_cpu_swap(current_free_mem, memory_for_inference)
+                cpu_swap_memory = compute_memory_for_cpu_swap(current_free_mem, memory_for_inference, previously_loaded)
 
         if vram_set_state == VRAMState.NO_VRAM:
             cpu_swap_memory = 0
