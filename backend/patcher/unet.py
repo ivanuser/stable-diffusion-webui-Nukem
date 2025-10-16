@@ -3,8 +3,12 @@ import copy
 import torch
 
 from backend.modules.k_model import KModel
-from backend.nn.svdq import NunchakuModelMixin
 from backend.patcher.base import ModelPatcher
+
+try:
+    from backend.nn.svdq import NunchakuModelMixin
+except ImportError:
+    NunchakuModelMixin = type(None)
 
 
 class UnetPatcher(ModelPatcher):
