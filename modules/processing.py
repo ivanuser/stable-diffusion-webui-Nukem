@@ -1826,7 +1826,7 @@ class StableDiffusionProcessingImg2Img(StableDiffusionProcessing):
 
         if image_mask is not None:
             init_mask = latent_mask
-            latmask = init_mask.convert("RGB").resize((self.init_latent.shape[3], self.init_latent.shape[2]))
+            latmask = init_mask.convert("RGB").resize((self.init_latent.shape[-1], self.init_latent.shape[-2]))
             latmask = np.moveaxis(np.array(latmask, dtype=np.float32), 2, 0) / 255
             latmask = latmask[0]
             if self.mask_round:
@@ -1836,9 +1836,19 @@ class StableDiffusionProcessingImg2Img(StableDiffusionProcessing):
             self.mask = torch.asarray(1.0 - latmask).to(shared.device).type(devices.dtype)
             self.nmask = torch.asarray(latmask).to(shared.device).type(devices.dtype)
 
+            if len(self.mask.shape) != len(self.init_latent.shape):
+                x_dims = self.init_latent.dim()
+                if x_dims == 4:
+                    self.nmask = self.nmask[None, :, :, :]
+                    self.mask = self.mask[None, :, :, :]
+                elif x_dims == 5:
+                    self.nmask = self.nmask[None, :, None, :, :]
+                    self.mask = self.mask[None, :, None, :, :]
+
             # this needs to be fixed to be done in sample() using actual seeds for batches
             if self.inpainting_fill == 2:
-                self.init_latent = self.init_latent * self.mask + create_random_tensors(self.init_latent.shape[1:], all_seeds[0 : self.init_latent.shape[0]]) * self.nmask
+                _dim = (self.init_latent.shape[1], self.init_latent.shape[-2], self.init_latent.shape[-1])
+                self.init_latent = self.init_latent * self.mask + create_random_tensors(_dim, all_seeds[0 : self.init_latent.shape[0]]) * self.nmask
                 self.extra_generation_params["Masked content"] = "latent noise"
 
             elif self.inpainting_fill == 3:
