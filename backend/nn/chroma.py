@@ -6,7 +6,15 @@ import torch
 from einops import rearrange, repeat
 from torch import nn
 
-from backend.nn.flux import EmbedND, MLPEmbedder, QKNorm, RMSNorm, SelfAttention, attention, timestep_embedding
+from backend.nn.flux import (
+    EmbedND,
+    MLPEmbedder,
+    QKNorm,
+    RMSNorm,
+    SelfAttention,
+    attention,
+    timestep_embedding,
+)
 from backend.utils import fp16_fix
 
 

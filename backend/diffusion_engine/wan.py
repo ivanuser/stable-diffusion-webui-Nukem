@@ -38,9 +38,6 @@ class Wan(ForgeDiffusionEngine):
 
         self.is_wan = True
 
-    def set_clip_skip(self, clip_skip):
-        pass
-
     @torch.inference_mode()
     def get_learned_conditioning(self, prompt: list[str]):
         memory_management.load_model_gpu(self.forge_objects.clip.patcher)

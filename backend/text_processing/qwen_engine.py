@@ -18,7 +18,6 @@ class QwenTextProcessingEngine:
         self.text_encoder = text_encoder
         self.tokenizer = tokenizer
 
-        self.emphasis = emphasis.get_current_option(opts.emphasis)()
         self.max_length = 99999999
         self.min_length = 1
         self.id_pad = 151643
@@ -92,22 +91,22 @@ class QwenTextProcessingEngine:
             if line in cache:
                 line_z_values = cache[line]
             else:
-                chunks, token_count = self.tokenize_line(line, images)
+                chunks, _ = self.tokenize_line(line, images)
                 line_z_values = []
 
-                #   pad all chunks to length of longest chunk
-                max_tokens = 0
-                for chunk in chunks:
-                    max_tokens = max(len(chunk.tokens), max_tokens)
+                # pad all chunks to length of longest chunk
+                # max_tokens = 0
+                # for chunk in chunks:
+                #     max_tokens = max(len(chunk.tokens), max_tokens)
 
                 for chunk in chunks:
                     tokens = chunk.tokens
                     multipliers = chunk.multipliers
 
-                    remaining_count = max_tokens - len(tokens)
-                    if remaining_count > 0:
-                        tokens += [self.id_pad] * remaining_count
-                        multipliers += [1.0] * remaining_count
+                    # remaining_count = max_tokens - len(tokens)
+                    # if remaining_count > 0:
+                    #     tokens += [self.id_pad] * remaining_count
+                    #     multipliers += [1.0] * remaining_count
 
                     z = self.process_tokens([tokens], [multipliers])[0]
                     z = self.strip_template(z, tokens)

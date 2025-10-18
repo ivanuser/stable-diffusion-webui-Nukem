@@ -1,5 +1,3 @@
-import safetensors.torch as sf
-
 from backend import utils
 
 
@@ -33,16 +31,16 @@ class ForgeDiffusionEngine:
         pass
 
     def get_first_stage_encoding(self, x):
-        return x  # legacy code, do not change
+        return x
 
     def get_learned_conditioning(self, prompt: list[str]):
-        pass
+        raise NotImplementedError
 
     def encode_first_stage(self, x):
-        pass
+        raise NotImplementedError
 
     def decode_first_stage(self, x):
-        pass
+        raise NotImplementedError
 
     def get_prompt_lengths_on_ui(self, prompt):
         return 0, 75
@@ -58,15 +56,18 @@ class ForgeDiffusionEngine:
         self.is_sd1 = False
         self.is_sd2 = False
         self.is_sdxl = False
-        self.is_wan = False
-        return
+        self.is_wan = False  # also affects the usage of WanVAE
 
     def save_unet(self, filename):
+        import safetensors.torch as sf
+
         sd = utils.get_state_dict_after_quant(self.forge_objects.unet.model.diffusion_model)
         sf.save_file(sd, filename)
         return filename
 
     def save_checkpoint(self, filename):
+        import safetensors.torch as sf
+
         sd = {}
         sd.update(utils.get_state_dict_after_quant(self.forge_objects.unet.model.diffusion_model, prefix="model.diffusion_model."))
         sd.update(utils.get_state_dict_after_quant(self.forge_objects.clip.cond_stage_model, prefix="text_encoders."))

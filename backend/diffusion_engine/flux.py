@@ -43,7 +43,6 @@ class Flux(ForgeDiffusionEngine):
             embedding_dir=dynamic_args["embedding_dir"],
             embedding_key="clip_l",
             embedding_expected_shape=768,
-            emphasis_name=dynamic_args["emphasis_name"],
             text_projection=False,
             minimal_clip_skip=1,
             clip_skip=1,

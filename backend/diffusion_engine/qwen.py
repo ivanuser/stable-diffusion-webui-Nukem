@@ -47,9 +47,6 @@ class QwenImage(ForgeDiffusionEngine):
         self.ref_latents = []
         self.image_prompt = ""
 
-    def set_clip_skip(self, clip_skip):
-        pass
-
     @torch.inference_mode()
     def get_learned_conditioning(self, prompt: "SdConditioning"):
         memory_management.load_model_gpu(self.forge_objects.clip.patcher)
