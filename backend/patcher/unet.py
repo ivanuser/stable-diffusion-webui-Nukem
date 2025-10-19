@@ -207,7 +207,7 @@ class NunchakuPatcher(UnetPatcher):
         return self.model
 
     def forge_unpatch_model(self, target_device=None):
-        if target_device is not None:
+        if target_device is not None and hasattr(self.model, "diffusion_model"):  # k_model/KModel/cleanup()
             self.model.diffusion_model.to(target_device)
 
     def to_load_list(self):
