@@ -63,6 +63,7 @@ class ClassicTextProcessingEngine:
 
         self.text_encoder = text_encoder
         self.tokenizer = tokenizer
+        self.emphasis = emphasis.get_current_option(opts.emphasis)()
 
         self.text_projection = text_projection
         self.minimal_clip_skip = minimal_clip_skip
