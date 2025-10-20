@@ -86,7 +86,8 @@ class QwenImage(ForgeDiffusionEngine):
         height = round(samples.shape[2] * scale_by / 8.0) * 8
 
         s = torch.nn.functional.interpolate(samples, size=(height, width), mode="area")
-        self.ref_latents.append(self.forge_objects.vae.encode(s.movedim(1, -1)[:, :, :, :3]))
+        sample = self.forge_objects.vae.encode(s.movedim(1, -1)[:, :, :, :3])
+        self.ref_latents.append(self.forge_objects.vae.first_stage_model.process_in(sample))
 
         self.image_prompt += f"Picture {len(self.images_vl)}: <|vision_start|><|image_pad|><|vision_end|>"
 
