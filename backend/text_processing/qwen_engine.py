@@ -27,17 +27,14 @@ class QwenTextProcessingEngine:
         self.llama_template = "<|im_start|>system\nDescribe the image by detailing the color, shape, size, texture, quantity, text, spatial relationships of the objects and background:<|im_end|>\n<|im_start|>user\n{}<|im_end|>\n<|im_start|>assistant\n"
         self.image_template = "<|im_start|>system\nDescribe the key features of the input image (color, shape, size, texture, objects, background), then explain how the user's text instruction should alter or modify the image. Generate a new image that meets the user's requirements while maintaining consistency with the original input where appropriate.<|im_end|>\n<|im_start|>user\n{}<|im_end|>\n<|im_start|>assistant\n"
 
-    def tokenize(self, texts, template=None):
-        llama_texts = [(template or self.llama_template).format(text) for text in texts]
+    def tokenize(self, texts, vision=False):
+        llama_texts = [(self.image_template if vision else self.llama_template).format(text) for text in texts]
         return self.tokenizer(llama_texts)["input_ids"]
 
     def tokenize_line(self, line, images=None):
         parsed = parsing.parse_prompt_attention(line, self.emphasis.name)
 
-        tokenized = self.tokenize(
-            [text for text, _ in parsed],
-            self.image_template if bool(images) else self.llama_template,
-        )
+        tokenized = self.tokenize([text for text, _ in parsed], bool(images))
 
         chunks = []
         chunk = PromptChunk()
