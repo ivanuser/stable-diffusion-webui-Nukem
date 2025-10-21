@@ -135,6 +135,7 @@ def progressapi(req: ProgressRequest):
                         save_kwargs = {"optimize": False, "compress_level": 1}
 
                 else:
+                    image = image.convert("RGB")
                     save_kwargs = {}
 
                 image.save(buffered, format=opts.live_previews_image_format, **save_kwargs)
