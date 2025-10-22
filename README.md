@@ -22,7 +22,7 @@ The name "Forge" is inspired by "Minecraft Forge". This project aims to become t
 
 <br>
 
-## Features [Oct. 08]
+## Features [Oct. 22]
 > Most base features of the original [Automatic1111 Webui](https://github.com/AUTOMATIC1111/stable-diffusion-webui) should still function
 
 #### New Features
@@ -35,17 +35,22 @@ The name "Forge" is inspired by "Minecraft Forge". This project aims to become t
 > [!Important]
 > To export a video, you need to have **[FFmpeg](https://ffmpeg.org/)** installed
 
-- [X] Support [Qwen-Image](https://github.com/QwenLM/Qwen-Image)
-    - **not** `qwen-image-edit`
-- [X] Support [Nunchaku](https://github.com/nunchaku-tech/nunchaku) (`SVDQ`) Models
-    - `dev`, `krea`, `kontext`, `qwen-image`, `t5`
-- [X] Support [Flux Kontext](https://huggingface.co/black-forest-labs/FLUX.1-Kontext-dev)
+- [X] Support [Qwen-Image](https://huggingface.co/Qwen/Qwen-Image)
+- [X] Support [Qwen-Image-Edit](https://huggingface.co/Qwen/Qwen-Image-Edit-2509)
     - `img2img`, `inpaint`
-    - support multi-image inputs
 
 > [!Note]
-> Since the `state_dict` between **Flux-Dev**, **Flux-Krea**, and **Flux-Kontext** are exactly the same, to be properly detected as a **Kontext** model, the model needs to include "`kontext`" in its path, either the file or folder name.
+> Since the layers between **Qwen-Image** and **Qwen-Image-Edit** are exactly the same, to be properly detected as an **Edit** model, the model needs to include "`qwen`" and "`edit`" in its path, either the file name or folder name.
 
+- [X] Support [Flux Kontext](https://huggingface.co/black-forest-labs/FLUX.1-Kontext-dev)
+    - `img2img`, `inpaint`
+
+> [!Note]
+> Since the layers between **Flux-Dev**, **Flux-Krea**, and **Flux-Kontext** are exactly the same, to be properly detected as a **Kontext** model, the model needs to include "`kontext`" in its path, either the file name or folder name.
+
+- [X] Support Multi-Image Inputs for **Qwen-Image-Edit** and **Flux-Kontext**
+- [X] Support [Nunchaku](https://github.com/nunchaku-tech/nunchaku) (`SVDQ`) Models
+    - `flux-dev`, `flux-krea`, `flux-kontext`, `qwen-image`, `qwen-image-edit`, `t5`
 - [X] Support [Chroma](https://huggingface.co/lodestones/Chroma)
     - special thanks: [@croquelois](https://github.com/lllyasviel/stable-diffusion-webui-forge/pull/2925)
 - [X] Rewrite Preset System
