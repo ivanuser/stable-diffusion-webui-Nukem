@@ -429,7 +429,6 @@ options_templates.update(
         {
             "infotext_explanation": OptionHTML("Infotext is what the webui calls the text that contains generation parameters, and can be used to generate the same image again."),
             "enable_pnginfo": OptionInfo(True, "Write infotext to metadata of generated images"),
-            "stealth_pnginfo_option": OptionInfo("None", "Stealth Infotext Mode", gr.Radio, {"choices": ("Alpha", "RGB", "None")}),
             "save_txt": OptionInfo(False, "Write infotext to a text file next to every generated image"),
             "add_model_name_to_info": OptionInfo(True, "Add model name to infotext"),
             "add_model_hash_to_info": OptionInfo(True, "Add model hash to infotext"),
