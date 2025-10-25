@@ -128,7 +128,7 @@ class ForgeCanvas:
         canvas_html_uuid = canvas_html.replace("forge_mixin", self.uuid)
 
         if opts.forge_canvas_plain:
-            canvas_html_uuid = canvas_html_uuid.replace('class="forge-image-container"', 'class="forge-image-container plain"').replace('stroke="white"', "stroke=#444")
+            canvas_html_uuid = canvas_html_uuid.replace('class="forge-image-container"', f'class="forge-image-container plain" style="background-color: {opts.forge_canvas_plain_color}"').replace('stroke="white"', "stroke=#444")
         if opts.forge_canvas_toolbar_always:
             canvas_html_uuid = canvas_html_uuid.replace('class="forge-toolbar"', 'class="forge-toolbar-static"')
 

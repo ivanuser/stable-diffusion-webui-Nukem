@@ -6,10 +6,6 @@
     user-select: none;
 }
 
-.forge-image-container.plain {
-    background-color: #808080;
-}
-
 .forge-image-container:not(.plain) {
     background-color: #cccccc;
     background-image:
