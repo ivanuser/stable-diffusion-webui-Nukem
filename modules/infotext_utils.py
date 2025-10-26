@@ -342,6 +342,8 @@ def parse_generation_parameters(x: str, skip_fields: list[str] | None = None):
     res["Negative prompt"] = negative_prompt
 
     for k, v in re_param.findall(lastline):
+        if k == "Noise Schedule":
+            continue
         try:
             if v[0] == '"' and v[-1] == '"':
                 v = unquote(v)
