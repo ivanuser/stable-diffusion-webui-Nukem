@@ -402,16 +402,17 @@ def unload_model_weights(sd_model=None, info=None):
 
 
 def apply_token_merging(sd_model, token_merging_ratio):
-    if token_merging_ratio <= 0:
-        return
+    if token_merging_ratio > 0.0:
+        from backend.misc.tomesd import TomePatcher
 
-    print(f"token_merging_ratio = {token_merging_ratio}")
+        sd_model.forge_objects.unet = TomePatcher.patch(model=sd_model.forge_objects.unet, ratio=token_merging_ratio)
+        print(f"token_merging_ratio = {token_merging_ratio}")
 
-    from backend.misc.tomesd import TomePatcher
+    if opts.scaling_factor > 1.0:
+        from backend.misc.eps import EpsilonScaling
 
-    sd_model.forge_objects.unet = TomePatcher.patch(model=sd_model.forge_objects.unet, ratio=token_merging_ratio)
-
-    return
+        sd_model.forge_objects.unet = EpsilonScaling.patch(model=sd_model.forge_objects.unet, scaling_factor=opts.scaling_factor)
+        print(f"eps_scaling_factor = {opts.scaling_factor}")
 
 
 @torch.inference_mode()
