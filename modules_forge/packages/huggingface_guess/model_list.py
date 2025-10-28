@@ -44,12 +44,12 @@ class BASE:
     vae_target = "vae"
 
     @classmethod
-    def matches(s, unet_config, state_dict=None):
-        for k in s.unet_config:
-            if k not in unet_config or s.unet_config[k] != unet_config[k]:
+    def matches(cls, unet_config, state_dict=None):
+        for k in cls.unet_config:
+            if k not in unet_config or cls.unet_config[k] != unet_config[k]:
                 return False
         if state_dict is not None:
-            for k in s.required_keys:
+            for k in cls.required_keys:
                 if k not in state_dict:
                     return False
         return True
@@ -333,6 +333,34 @@ class Chroma(FluxSchnell):
         return result
 
 
+class Lumina2(BASE):
+    huggingface_repo = "neta-art/Neta-Lumina"
+
+    unet_config = {
+        "image_model": "lumina2",
+    }
+
+    sampling_settings = {
+        "multiplier": 1.0,
+        "shift": 6.0,
+    }
+
+    memory_usage_factor = 1.2
+
+    unet_extra_config = {}
+    latent_format = latent.Flux
+
+    supported_inference_dtypes = [torch.bfloat16, torch.float32]
+
+    vae_key_prefix = ["vae."]
+    text_encoder_key_prefix = ["text_encoders."]
+
+    unet_target = "transformer"
+
+    def clip_target(self, state_dict={}):
+        return {"gemma2_2b": "text_encoder"}
+
+
 class WAN21_T2V(BASE):
     huggingface_repo = "Wan-AI/Wan2.1-T2V-14B"
 
@@ -366,7 +394,7 @@ class WAN21_T2V(BASE):
 
 
 class WAN21_I2V(WAN21_T2V):
-    huggingface_repo = "Wan-AI/Wan2.1-I2V-14B-720P"
+    huggingface_repo = "Wan-AI/Wan2.1-I2V-14B"
 
     unet_config = {
         "image_model": "wan2.1",
@@ -414,6 +442,7 @@ models = [
     Flux,
     FluxSchnell,
     Chroma,
+    Lumina2,
     WAN21_T2V,
     WAN21_I2V,
     QwenImage,

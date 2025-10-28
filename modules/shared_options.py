@@ -229,6 +229,19 @@ options_templates.update(
             "sdxl_crop_left": OptionInfo(0, "[SDXL] Crop-Left Coordinate"),
             "sdxl_refiner_low_aesthetic_score": OptionInfo(2.5, "[SDXL] Low Aesthetic Score", gr.Number),
             "sdxl_refiner_high_aesthetic_score": OptionInfo(6.0, "[SDXL] High Aesthetic Score", gr.Number),
+            "divlumina": OptionDiv(),
+            "neta_template_positive": OptionInfo(
+                "You are an assistant designed to generate anime images with the highest degree of image-text alignment based on danbooru tags. <Prompt Start>",
+                "[Lumina] Positive Template",
+                gr.Textbox,
+                {"lines": 3, "max_lines": 6, "placeholder": "<Prompt Start>"},
+            ),
+            "neta_template_negative": OptionInfo(
+                "You are an assistant designed to generate low-quality images based on textual prompts. <Prompt Start>",
+                "[Lumina] Negative Template",
+                gr.Textbox,
+                {"lines": 3, "max_lines": 6, "placeholder": "<Prompt Start>"},
+            ),
         },
     )
 )
@@ -282,7 +295,7 @@ options_templates.update(
         ("optimizations", "Optimizations", "sd"),
         {
             "cross_attention_optimization": OptionInfo("Automatic", "Cross Attention Optimization", gr.Dropdown, {"choices": ("Automatic",), "interactive": False}),
-            "persistent_cond_cache": OptionInfo(False, "Persistent Cond Cache").info("do not re-encode prompts if only the Seed changes ; <b>Note:</b> breaks Qwen-Image-Edit if only the input image was changed"),
+            "persistent_cond_cache": OptionInfo(True, "Persistent Cond Cache").info("do not re-encode prompts if only the Seed changes ; <b>Note:</b> only applies to SD1 and SDXL checkpoints"),
             "skip_early_cond": OptionInfo(0.0, "Ignore Negative Prompt during Early Steps", gr.Slider, {"minimum": 0.0, "maximum": 1.0, "step": 0.05}, infotext="Skip Early CFG").info("in percentage of total steps; 0 = disable; higher = faster"),
             "s_min_uncond": OptionInfo(0.0, "Skip Negative Prompt during Later Steps", gr.Slider, {"minimum": 0.0, "maximum": 8.0, "step": 0.05}).info('in "sigma"; 0 = disable; higher = faster'),
             "s_min_uncond_all": OptionInfo(False, "For the above option, skip every step", infotext="NGMS all steps").info("otherwise, only skip every other step"),

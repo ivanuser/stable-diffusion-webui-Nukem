@@ -58,7 +58,7 @@ def make_checkpoint_manager_ui():
         if len(sd_models.checkpoints_list) > 0:
             shared.opts.set("sd_model_checkpoint", next(iter(sd_models.checkpoints_list.values())).name)
 
-    ui_forge_preset = gr.Radio(label="UI Preset", value=lambda: shared.opts.forge_preset, choices=("sd", "xl", "flux", "qwen", "wan"), elem_id="forge_ui_preset")
+    ui_forge_preset = gr.Radio(label="UI Preset", value=lambda: shared.opts.forge_preset, choices=("sd", "xl", "flux", "qwen", "lumina", "wan"), elem_id="forge_ui_preset")
 
     ui_checkpoint = gr.Dropdown(label="Checkpoint", value=None, choices=None, elem_classes=["model_selection"])
 
@@ -303,7 +303,7 @@ def on_preset_change(preset: str):
     if model_mem < 0 or model_mem > total_vram:
         model_mem = total_vram - 1024
 
-    show_clip_skip = preset not in ("qwen", "wan")
+    show_clip_skip = preset not in ("qwen", "lumina", "wan")
     show_basic_mem = preset != "sd"
     show_adv_mem = preset in ("flux", "qwen", "wan")
     distilled = preset in ("flux", "wan")
@@ -315,7 +315,7 @@ def on_preset_change(preset: str):
     return [
         gr.update(value=getattr(shared.opts, f"forge_checkpoint_{preset}", shared.opts.sd_model_checkpoint)),  # ui_checkpoint
         gr.update(value=additional_modules),  # ui_vae
-        gr.update(visible=show_clip_skip, value=getattr(shared.opts, "CLIP_stop_at_last_layers", 1)),  # ui_clip_skip
+        gr.update(visible=show_clip_skip, value=getattr(shared.opts, "CLIP_stop_at_last_layers", 2)),  # ui_clip_skip
         gr.update(visible=show_basic_mem, value=getattr(shared.opts, "forge_unet_storage_dtype", "Automatic")),  # ui_forge_unet_storage_dtype_options
         gr.update(visible=show_adv_mem, value=getattr(shared.opts, "forge_async_loading", "Queue")),  # ui_forge_async_loading
         gr.update(visible=show_adv_mem, value=getattr(shared.opts, "forge_pin_shared_memory", "CPU")),  # ui_forge_pin_shared_memory
