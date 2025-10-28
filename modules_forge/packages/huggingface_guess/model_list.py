@@ -320,17 +320,18 @@ class Chroma(FluxSchnell):
 
     supported_inference_dtypes = [torch.bfloat16, torch.float16, torch.float32]
 
-    def clip_target(self, state_dict={}):
-        result = {}
-        pref = self.text_encoder_key_prefix[0]
+    text_encoder_key_prefix = ["text_encoders.", "cond_stage_model."]
 
-        if "{}t5xxl.transformer.encoder.final_layer_norm.weight".format(pref) in state_dict:
-            result["t5xxl"] = "text_encoder"
+    def clip_target(self, state_dict: dict):
+        for pref in self.text_encoder_key_prefix:
+            if "{}t5xxl.transformer.encoder.final_layer_norm.weight".format(pref) in state_dict:
+                return {"t5xxl": "text_encoder"}
+            elif "{}t5xxl.transformer.encoder.final_layer_norm.qweight".format(pref) in state_dict:
+                return {"t5xxl": "text_encoder"}
 
-        elif "{}t5xxl.transformer.encoder.final_layer_norm.qweight".format(pref) in state_dict:
-            result["t5xxl"] = "text_encoder"
-
-        return result
+    def process_vae_state_dict(self, state_dict):
+        replace_prefix = {"first_stage_model.": "vae."}
+        return utils.state_dict_prefix_replace(state_dict, replace_prefix)
 
 
 class Lumina2(BASE):
@@ -358,7 +359,13 @@ class Lumina2(BASE):
     unet_target = "transformer"
 
     def clip_target(self, state_dict={}):
-        return {"gemma2_2b": "text_encoder"}
+        pref = self.text_encoder_key_prefix[0]
+        if "{}gemma2_2b.transformer.model.embed_tokens.weight".format(pref) in state_dict:
+            state_dict.pop("{}gemma2_2b.logit_scale".format(pref), None)
+            state_dict.pop("{}spiece_model".format(pref), None)
+            return {"gemma2_2b.transformer": "text_encoder"}
+        else:
+            return {"gemma2_2b": "text_encoder"}
 
 
 class WAN21_T2V(BASE):
