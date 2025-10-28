@@ -16,7 +16,8 @@ class PresetArch(Enum):
     xl = 2
     flux = 3
     qwen = 4
-    wan = 5
+    lumina = 5
+    wan = 6
 
 
 SAMPLERS = {
@@ -24,6 +25,7 @@ SAMPLERS = {
     PresetArch.xl: "DPM++ 2M SDE",
     PresetArch.flux: "Euler",
     PresetArch.qwen: "LCM",
+    PresetArch.lumina: "Res Multistep",
     PresetArch.wan: "Euler",
 }
 
@@ -32,6 +34,7 @@ SCHEDULERS = {
     PresetArch.xl: "Karras",
     PresetArch.flux: "Beta",
     PresetArch.qwen: "Normal",
+    PresetArch.lumina: "Linear Quadratic",
     PresetArch.wan: "Simple",
 }
 
@@ -40,6 +43,7 @@ WIDTH = {
     PresetArch.xl: 896,
     PresetArch.flux: 896,
     PresetArch.qwen: 896,
+    PresetArch.lumina: 1024,
     PresetArch.wan: 1152,
 }
 
@@ -48,6 +52,7 @@ HEIGHT = {
     PresetArch.xl: 1152,
     PresetArch.flux: 1152,
     PresetArch.qwen: 1152,
+    PresetArch.lumina: 1024,
     PresetArch.wan: 896,
 }
 
@@ -56,6 +61,7 @@ CFG = {
     PresetArch.xl: 4.0,
     PresetArch.flux: 1.0,
     PresetArch.qwen: 1.0,
+    PresetArch.lumina: 4.5,
     PresetArch.wan: 1.0,
 }
 
