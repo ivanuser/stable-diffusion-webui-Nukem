@@ -4,7 +4,7 @@ import gradio as gr
 import torch
 from gradio.context import Context
 
-from backend import memory_management, stream
+from backend import memory_management, operations, stream
 from backend.args import dynamic_args
 from modules import infotext_utils, paths, processing, sd_models, shared, shared_items, ui_common
 
@@ -27,13 +27,17 @@ forge_unet_storage_dtype_options = {
     "Automatic (fp16 LoRA)": (None, True),
     "float8-e4m3fn": (torch.float8_e4m3fn, False),
     "float8-e4m3fn (fp16 LoRA)": (torch.float8_e4m3fn, True),
+}
+
+bnb_storage_dtype_options = {
     "bnb-nf4": ("nf4", False),
     "bnb-nf4 (fp16 LoRA)": ("nf4", True),
     "bnb-fp4": ("fp4", False),
     "bnb-fp4 (fp16 LoRA)": ("fp4", True),
-    # "float8-e5m2": (torch.float8_e5m2, False),
-    # "float8-e5m2 (fp16 LoRA)": (torch.float8_e5m2, True),
 }
+
+if operations.bnb_available:
+    forge_unet_storage_dtype_options.update(bnb_storage_dtype_options)
 
 module_list = {}
 

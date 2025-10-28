@@ -416,7 +416,7 @@ try:
                         return functional_linear_4bits(x, weight, bias)
 
     bnb_available = True
-except:
+except ImportError:
     bnb_available = False
 
 
