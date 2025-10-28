@@ -375,7 +375,7 @@ class StableDiffusionProcessing:
         self.sampler = None
         self.c = None
         self.uc = None
-        if not opts.persistent_cond_cache:
+        if not (opts.persistent_cond_cache and self.sd_model.is_webui_legacy_model()):
             StableDiffusionProcessing.cached_c = [None, None]
             StableDiffusionProcessing.cached_uc = [None, None]
 
@@ -1168,6 +1168,7 @@ def process_images_inner(p: StableDiffusionProcessing) -> Processed:
         p.scripts.postprocess(p, res)
 
     dynamic_args.pop("ref_latents", None)
+    dynamic_args.pop("num_tokens", None)
     return res
 
 
@@ -1550,7 +1551,7 @@ class StableDiffusionProcessingTxt2Img(StableDiffusionProcessing):
         super().close()
         self.hr_c = None
         self.hr_uc = None
-        if not opts.persistent_cond_cache:
+        if not (opts.persistent_cond_cache and self.sd_model.is_webui_legacy_model()):
             StableDiffusionProcessingTxt2Img.cached_hr_uc = [None, None]
             StableDiffusionProcessingTxt2Img.cached_hr_c = [None, None]
 
