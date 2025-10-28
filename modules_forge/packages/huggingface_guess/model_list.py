@@ -10,12 +10,8 @@ from . import diffusers_convert, latent, utils
 class ModelType(Enum):
     EPS = 1
     V_PREDICTION = 2
-    V_PREDICTION_EDM = 3
-    STABLE_CASCADE = 4
-    EDM = 5
-    FLOW = 6
-    V_PREDICTION_CONTINUOUS = 7
-    FLUX = 8
+    FLUX = 3
+    FLOW = 4
 
 
 class BASE:
@@ -54,10 +50,10 @@ class BASE:
                     return False
         return True
 
-    def model_type(self, state_dict, prefix=""):
+    def model_type(self, state_dict):
         return ModelType.EPS
 
-    def clip_target(self, state_dict):
+    def clip_target(self, state_dict: dict):
         return {}
 
     def inpaint_model(self):
@@ -71,8 +67,8 @@ class BASE:
             self.unet_config[x] = self.unet_extra_config[x]
 
     def process_clip_state_dict(self, state_dict):
-        state_dict = utils.state_dict_prefix_replace(state_dict, {k: "" for k in self.text_encoder_key_prefix}, filter_keys=True)
-        return state_dict
+        replace_prefix = {k: "" for k in self.text_encoder_key_prefix}
+        return utils.state_dict_prefix_replace(state_dict, replace_prefix, filter_keys=True)
 
     def process_unet_state_dict(self, state_dict):
         return state_dict
@@ -130,10 +126,8 @@ class SD15(BASE):
             if ids.dtype == torch.float32:
                 state_dict["cond_stage_model.transformer.text_model.embeddings.position_ids"] = ids.round()
 
-        replace_prefix = {}
-        replace_prefix["cond_stage_model."] = "clip_l."
-        state_dict = utils.state_dict_prefix_replace(state_dict, replace_prefix, filter_keys=True)
-        return state_dict
+        replace_prefix = {"cond_stage_model.": "clip_l."}
+        return utils.state_dict_prefix_replace(state_dict, replace_prefix, filter_keys=True)
 
     def process_clip_state_dict_for_saving(self, state_dict):
         pop_keys = ["clip_l.transformer.text_projection.weight", "clip_l.logit_scale"]
@@ -144,7 +138,7 @@ class SD15(BASE):
         replace_prefix = {"clip_l.": "cond_stage_model."}
         return utils.state_dict_prefix_replace(state_dict, replace_prefix)
 
-    def clip_target(self, state_dict={}):
+    def clip_target(self, state_dict: dict):
         return {"clip_l": "text_encoder"}
 
 
@@ -164,25 +158,18 @@ class SDXLRefiner(BASE):
     memory_usage_factor = 1.0
 
     def process_clip_state_dict(self, state_dict):
-        keys_to_replace = {}
-        replace_prefix = {}
-        replace_prefix["conditioner.embedders.0.model."] = "clip_g."
+        replace_prefix = {"conditioner.embedders.0.model.": "clip_g."}
         state_dict = utils.state_dict_prefix_replace(state_dict, replace_prefix, filter_keys=True)
-
-        state_dict = utils.clip_text_transformers_convert(state_dict, "clip_g.", "clip_g.transformer.")
-        state_dict = utils.state_dict_key_replace(state_dict, keys_to_replace)
-        return state_dict
+        return utils.clip_text_transformers_convert(state_dict, "clip_g.", "clip_g.transformer.")
 
     def process_clip_state_dict_for_saving(self, state_dict):
-        replace_prefix = {}
         state_dict_g = diffusers_convert.convert_text_enc_state_dict_v20(state_dict, "clip_g")
         if "clip_g.transformer.text_model.embeddings.position_ids" in state_dict_g:
             state_dict_g.pop("clip_g.transformer.text_model.embeddings.position_ids")
-        replace_prefix["clip_g"] = "conditioner.embedders.0.model"
-        state_dict_g = utils.state_dict_prefix_replace(state_dict_g, replace_prefix)
-        return state_dict_g
+        replace_prefix = {"clip_g": "conditioner.embedders.0.model"}
+        return utils.state_dict_prefix_replace(state_dict_g, replace_prefix)
 
-    def clip_target(self, state_dict={}):
+    def clip_target(self, state_dict: dict):
         return {"clip_g": "text_encoder"}
 
 
@@ -201,32 +188,21 @@ class SDXL(BASE):
     latent_format = latent.SDXL
     memory_usage_factor = 0.8
 
-    def model_type(self, state_dict, prefix=""):
-        if "edm_vpred.sigma_max" in state_dict:
-            self.sampling_settings["sigma_max"] = float(state_dict["edm_vpred.sigma_max"].item())
-            if "edm_vpred.sigma_min" in state_dict:
-                self.sampling_settings["sigma_min"] = float(state_dict["edm_vpred.sigma_min"].item())
-            return ModelType.V_PREDICTION_EDM
-        elif "v_pred" in state_dict:
-            self.sampling_settings["zsnr"] = "ztsnr" in state_dict
+    def model_type(self, state_dict: dict):
+        if "v_pred" in state_dict:
             return ModelType.V_PREDICTION
         else:
             return ModelType.EPS
 
     def process_clip_state_dict(self, state_dict):
-        keys_to_replace = {}
-        replace_prefix = {}
-
-        replace_prefix["conditioner.embedders.0.transformer.text_model"] = "clip_l.transformer.text_model"
-        replace_prefix["conditioner.embedders.1.model."] = "clip_g."
+        replace_prefix = {
+            "conditioner.embedders.0.transformer.text_model": "clip_l.transformer.text_model",
+            "conditioner.embedders.1.model.": "clip_g.",
+        }
         state_dict = utils.state_dict_prefix_replace(state_dict, replace_prefix, filter_keys=True)
-
-        state_dict = utils.state_dict_key_replace(state_dict, keys_to_replace)
-        state_dict = utils.clip_text_transformers_convert(state_dict, "clip_g.", "clip_g.transformer.")
-        return state_dict
+        return utils.clip_text_transformers_convert(state_dict, "clip_g.", "clip_g.transformer.")
 
     def process_clip_state_dict_for_saving(self, state_dict):
-        replace_prefix = {}
         state_dict_g = diffusers_convert.convert_text_enc_state_dict_v20(state_dict, "clip_g")
         for k in state_dict:
             if k.startswith("clip_l"):
@@ -238,12 +214,13 @@ class SDXL(BASE):
             if p in state_dict_g:
                 state_dict_g.pop(p)
 
-        replace_prefix["clip_g"] = "conditioner.embedders.1.model"
-        replace_prefix["clip_l"] = "conditioner.embedders.0"
-        state_dict_g = utils.state_dict_prefix_replace(state_dict_g, replace_prefix)
-        return state_dict_g
+        replace_prefix = {
+            "clip_g": "conditioner.embedders.1.model",
+            "clip_l": "conditioner.embedders.0",
+        }
+        return utils.state_dict_prefix_replace(state_dict_g, replace_prefix)
 
-    def clip_target(self, state_dict={}):
+    def clip_target(self, state_dict: dict):
         return {"clip_l": "text_encoder", "clip_g": "text_encoder_2"}
 
 
@@ -273,7 +250,10 @@ class Flux(BASE):
         super().__init__(unet_config)
         self.nunchaku: bool = self.unet_config.pop("nunchaku", False)
 
-    def clip_target(self, state_dict={}):
+    def model_type(self, state_dict):
+        return ModelType.FLUX
+
+    def clip_target(self, state_dict: dict):
         result = {}
         pref = self.text_encoder_key_prefix[0]
 
@@ -358,7 +338,10 @@ class Lumina2(BASE):
 
     unet_target = "transformer"
 
-    def clip_target(self, state_dict={}):
+    def model_type(self, state_dict):
+        return ModelType.FLOW
+
+    def clip_target(self, state_dict: dict):
         pref = self.text_encoder_key_prefix[0]
         if "{}gemma2_2b.transformer.model.embed_tokens.weight".format(pref) in state_dict:
             state_dict.pop("{}gemma2_2b.logit_scale".format(pref), None)
@@ -396,7 +379,10 @@ class WAN21_T2V(BASE):
         super().__init__(unet_config)
         self.memory_usage_factor = self.unet_config.get("dim", 2000) / 2000
 
-    def clip_target(self, state_dict={}):
+    def model_type(self, state_dict):
+        return ModelType.FLOW
+
+    def clip_target(self, state_dict: dict):
         return {"umt5xxl": "text_encoder"}
 
 
@@ -438,7 +424,10 @@ class QwenImage(BASE):
         super().__init__(unet_config)
         self.nunchaku: bool = self.unet_config.pop("nunchaku", False)
 
-    def clip_target(self, state_dict={}):
+    def model_type(self, state_dict):
+        return ModelType.FLOW
+
+    def clip_target(self, state_dict: dict):
         return {"qwen25": "text_encoder"}
 
 

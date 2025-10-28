@@ -153,16 +153,17 @@ def load_huggingface_component(guess, component_name, lib_name, cls_name, repo_p
 
             return model
         if cls_name in ["T5EncoderModel", "UMT5EncoderModel"]:
+            assert isinstance(state_dict, dict) and len(state_dict) > 16, "You do not have T5 state dict!"
+
             if filename := state_dict.get("transformer.filename", None):
                 if memory_management.is_device_cpu(memory_management.text_encoder_device()):
                     raise SystemError("nunchaku T5 does not support CPU!")
 
                 from backend.nn.svdq import SVDQT5
 
+                print("Using Nunchaku T5")
                 model = SVDQT5(filename)
                 return model
-
-            assert isinstance(state_dict, dict) and len(state_dict) > 16, "You do not have T5 state dict!"
 
             from backend.nn.t5 import IntegratedT5
 
@@ -646,11 +647,11 @@ def forge_loader(sd: os.PathLike, additional_state_dicts: list[os.PathLike] = No
     except ImportError:
         pass
 
-    # Fix Huggingface prediction type using .yaml config or estimated config detection
     prediction_types = {
         "EPS": "epsilon",
         "V_PREDICTION": "v_prediction",
-        "EDM": "edm",
+        "FLUX": "const",
+        "FLOW": "const",
     }
 
     has_prediction_type = "scheduler" in huggingface_components and hasattr(huggingface_components["scheduler"], "config") and "prediction_type" in huggingface_components["scheduler"].config
