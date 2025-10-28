@@ -330,12 +330,13 @@ class ForgeOperations:
 
     class RMSNorm(torch.nn.RMSNorm):
 
-        def __init__(self, *args, **kwargs):
+        def __init__(self, *args, add=False, **kwargs):
             kwargs["device"] = current_device
             kwargs["dtype"] = current_dtype
             super().__init__(*args, **kwargs)
             self.parameters_manual_cast = current_manual_cast_enabled
             self.bias = None
+            self.add = add  # add is used by Gemma2 2B
 
         def reset_parameters(self):
             self.bias = None
@@ -345,8 +346,12 @@ class ForgeOperations:
             if self.parameters_manual_cast:
                 weight, bias, signal = weights_manual_cast(self, x)
                 with main_stream_worker(weight, bias, signal):
+                    if self.add:
+                        return torch.nn.functional.rms_norm(x, self.normalized_shape, weight + 1.0, self.eps)
                     return torch.nn.functional.rms_norm(x, self.normalized_shape, weight, self.eps)
             else:
+                if self.add:
+                    return torch.nn.functional.rms_norm(x, self.normalized_shape, self.weight + 1.0, self.eps)
                 return super().forward(x)
 
     class Embedding(torch.nn.Embedding):
