@@ -508,7 +508,7 @@ def list_loaded_weights():
 
 
 def apply_token_merging(sd_model, token_merging_ratio):
-    if shared.opts.scaling_factor > 1.0:
+    if shared.opts.scaling_factor > 1.0 and sd_model.forge_objects.unet.model.model_type.name == "EPS":
         from ldm_patched.modules.eps import EpsilonScaling
 
         sd_model.forge_objects.unet = EpsilonScaling.patch(model=sd_model.forge_objects.unet, scaling_factor=shared.opts.scaling_factor)
