@@ -362,6 +362,27 @@ options_templates.update(
 
 options_templates.update(
     options_section(
+        ("refiner", "Refiner", "sd"),
+        {
+            "show_refiner": OptionInfo(False, "Display the Refiner Accordion").info("Refiner swaps the model in the middle of generation; useful for Wan 2.2 <b>High Noise</b> to <b>Low Noise</b> switching").needs_reload_ui(),
+            "refiner_lora_replacement": OptionInfo(
+                "high_noise=low_noise",
+                "Lora Replacements",
+                gr.Textbox,
+                {"lines": 3, "max_lines": 12, "placeholder": "high_noise=low_noise"},
+            ),
+            "refiner_lora_explanation": OptionHTML(
+                """
+Use the "Lora Replacements" to load different LoRAs between the normal pass and the refiner pass.<br>
+Separate the original and the target with an equal sign; Place each entry in its own line.
+                """
+            ),
+        },
+    )
+)
+
+options_templates.update(
+    options_section(
         ("ui_prompt_editing", "Prompt Editing", "ui"),
         {
             "keyedit_precision_attention": OptionInfo(0.1, "Precision for (attention:1.1) when editing the prompt with Ctrl + Up/Down", gr.Slider, {"minimum": 0.05, "maximum": 0.25, "step": 0.05}),
@@ -399,7 +420,6 @@ options_templates.update(
     options_section(
         ("ui_alternatives", "UI Alternatives", "ui"),
         {
-            "show_refiner": OptionInfo(False, "Display the Refiner Accordion").info('"deprecated" feature for SDXL').needs_reload_ui(),
             "show_rescale_cfg": OptionInfo(False, "Display the Rescale CFG Slider").info("feature for v-pred checkpoints").needs_reload_ui(),
             "show_mahiro": OptionInfo(False, "Display the MaHiRo Toggle").info('see <a href="https://huggingface.co/spaces/yoinked/blue-arxiv">blue-arxiv</a> - <b>id:</b> <ins>2024-1208.1</ins>').needs_reload_ui(),
             "paste_safe_guard": OptionInfo(False, 'Disable the "Read generation parameters" button (↙️) when negative prompt is not empty'),
