@@ -978,9 +978,6 @@ def process_images_inner(p: StableDiffusionProcessing) -> Processed:
             if p.n_iter > 1:
                 shared.state.job = f"Batch {n+1} out of {p.n_iter}"
 
-            # TODO: This currently seems broken. It should be fixed or removed.
-            sd_models.apply_alpha_schedule_override(p.sd_model, p)
-
             sigmas_backup = None
             if (opts.sd_noise_schedule == "Zero Terminal SNR" or getattr(p.sd_model.model_config, "ztsnr", False)) and p is not None:
                 p.extra_generation_params["Noise Schedule"] = "Zero Terminal SNR"
@@ -1409,33 +1406,32 @@ class StableDiffusionProcessingTxt2Img(StableDiffusionProcessing):
             else:
                 decoded_samples = None
 
-        with sd_models.SkipWritingToConfig():
-            fp_checkpoint = getattr(shared.opts, "sd_model_checkpoint")
-            fp_additional_modules = getattr(shared.opts, "forge_additional_modules")
+        fp_checkpoint = getattr(shared.opts, "sd_model_checkpoint")
+        fp_additional_modules = getattr(shared.opts, "forge_additional_modules")
 
-            reload = False
-            if hasattr(self, "hr_additional_modules") and "Use same choices" not in self.hr_additional_modules:
-                modules_changed = main_entry.modules_change(self.hr_additional_modules, preset=None, save=False, refresh=False)
-                if modules_changed:
-                    reload = True
+        reload = False
+        if hasattr(self, "hr_additional_modules") and "Use same choices" not in self.hr_additional_modules:
+            modules_changed = main_entry.modules_change(self.hr_additional_modules, preset=None, save=False, refresh=False)
+            if modules_changed:
+                reload = True
 
-            if self.hr_checkpoint_name and self.hr_checkpoint_name != "Use same checkpoint":
-                checkpoint_changed = main_entry.checkpoint_change(self.hr_checkpoint_name, preset=None, save=False, refresh=False)
-                if checkpoint_changed:
-                    self.firstpass_use_distilled_cfg_scale = self.sd_model.use_distilled_cfg_scale
-                    reload = True
+        if self.hr_checkpoint_name and self.hr_checkpoint_name != "Use same checkpoint":
+            checkpoint_changed = main_entry.checkpoint_change(self.hr_checkpoint_name, preset=None, save=False, refresh=False)
+            if checkpoint_changed:
+                self.firstpass_use_distilled_cfg_scale = self.sd_model.use_distilled_cfg_scale
+                reload = True
 
-            if reload:
-                try:
-                    main_entry.refresh_model_loading_parameters()
-                    sd_models.forge_model_reload()
-                finally:
-                    main_entry.modules_change(fp_additional_modules, preset=None, save=False, refresh=False)
-                    main_entry.checkpoint_change(fp_checkpoint, preset=None, save=False, refresh=False)
-                    main_entry.refresh_model_loading_parameters()
+        if reload:
+            try:
+                main_entry.refresh_model_loading_parameters()
+                sd_models.forge_model_reload()
+            finally:
+                main_entry.modules_change(fp_additional_modules, preset=None, save=False, refresh=False)
+                main_entry.checkpoint_change(fp_checkpoint, preset=None, save=False, refresh=False)
+                main_entry.refresh_model_loading_parameters()
 
-            if self.sd_model.use_distilled_cfg_scale:
-                self.extra_generation_params["Hires Distilled CFG Scale"] = self.hr_distilled_cfg
+        if self.sd_model.use_distilled_cfg_scale:
+            self.extra_generation_params["Hires Distilled CFG Scale"] = self.hr_distilled_cfg
 
         return self.sample_hr_pass(samples, decoded_samples, seeds, subseeds, subseed_strength, prompts)
 

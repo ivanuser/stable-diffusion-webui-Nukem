@@ -419,13 +419,12 @@ def draw_xyz_grid(p, xs, ys, zs, x_labels, y_labels, z_labels, cell, draw_legend
     return processed_result
 
 
-class SharedSettingsStackHelper(object):
+class SharedSettingsStackHelper:
     def __enter__(self):
         pass
 
-    def __exit__(self, exc_type, exc_value, tb):
-        modules.sd_models.reload_model_weights()
-        modules.sd_vae.reload_vae_weights()
+    def __exit__(self, *args, **kwargs):
+        pass
 
 
 re_range = re.compile(r"\s*([+-]?\s*\d+)\s*-\s*([+-]?\s*\d+)(?:\s*\(([+-]\d+)\s*\))?\s*")
