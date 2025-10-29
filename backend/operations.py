@@ -378,10 +378,13 @@ class ForgeOperations:
 try:
     from backend.operations_bnb import (
         ForgeLoader4Bit,
-        ForgeParams4bit,
         functional_dequantize_4bit,
         functional_linear_4bits,
     )
+except ImportError:
+    bnb_available = False
+else:
+    bnb_available = True
 
     class ForgeOperationsBNB4bits(ForgeOperations):
         class Linear(ForgeLoader4Bit):
@@ -414,10 +417,6 @@ try:
                     weight, bias, signal = weights_manual_cast(self, x, skip_weight_dtype=True, skip_bias_dtype=True)
                     with main_stream_worker(weight, bias, signal):
                         return functional_linear_4bits(x, weight, bias)
-
-    bnb_available = True
-except ImportError:
-    bnb_available = False
 
 
 from backend.operations_gguf import dequantize_tensor
