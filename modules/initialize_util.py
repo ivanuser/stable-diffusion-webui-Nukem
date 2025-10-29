@@ -170,11 +170,8 @@ def configure_sigint_handler():
 
 
 def configure_opts_onchange():
-    from modules import shared, sd_vae, ui_tempdir
-    from modules.call_queue import wrap_queued_call
-    from modules_forge import main_thread
+    from modules import shared, ui_tempdir
 
-    shared.opts.onchange("sd_vae_overrides_per_model_preferences", wrap_queued_call(lambda: main_thread.run_and_wait_result(sd_vae.reload_vae_weights)), call=False)
     shared.opts.onchange("temp_dir", ui_tempdir.on_tmpdir_changed)
     shared.opts.onchange("gradio_theme", shared.reload_gradio_theme)
     startup_timer.record("opts onchange")
