@@ -54,9 +54,9 @@ class ForgeDiffusionEngine:
         self.cond_stage_model = None
         self.use_distilled_cfg_scale = False
         self.is_sd1 = False
-        self.is_sd2 = False
         self.is_sdxl = False
-        self.is_wan = False  # also affects the usage of WanVAE
+        self.is_flux = False  # affects the usage of TAESD
+        self.is_wan = False  # affects the usage of WanVAE (B, C, T, H, W)
 
     def save_unet(self, filename):
         import safetensors.torch as sf
