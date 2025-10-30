@@ -554,6 +554,7 @@ class ExtraNetworksPage:
                 "data_sortdir": data_sortdir,
                 "tree_view_btn_extra_class": tree_view_btn_extra_class,
                 "tree_view_div_extra_class": tree_view_div_extra_class,
+                "extra_networks_tree_view_default_width": shared.opts.extra_networks_tree_view_default_width,
                 "tree_html": self.create_tree_view_html(tabname) if shared.opts.extra_networks_tree_view_enable else "",
                 "dir_btns_html": self.create_dir_buttons_html(tabname) if shared.opts.extra_networks_dir_btn_enable else "",
                 "items_html": self.create_card_view_html(tabname, none_message="Loading..." if empty else None),

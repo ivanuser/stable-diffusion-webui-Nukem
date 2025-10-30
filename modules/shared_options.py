@@ -304,6 +304,7 @@ However, the resulting UI is quite... sluggish.
             ),
             "extra_networks_tree_view_enable": OptionInfo(False, "Enable the Tree View").needs_reload_ui(),
             "extra_networks_tree_view_default_enabled": OptionInfo(False, "Show the Tree View by default").needs_reload_ui(),
+            "extra_networks_tree_view_default_width": OptionInfo(180, "Default Width for the Tree View", gr.Number).info("in pixels").needs_reload_ui(),
             "div_tree": OptionDiv(),
             "extra_networks_dir_btn_enable": OptionInfo(False, "Enable the Subdirectory Buttons").needs_reload_ui(),
             "extra_networks_hidden_models": OptionInfo("When searched", "Show the Extra Networks in hidden directories", gr.Radio, {"choices": ("Always", "When searched", "Never")}).info('"When searched" option will only show the item when the search string contains 4 characters or more'),
