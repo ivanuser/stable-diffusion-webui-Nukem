@@ -64,7 +64,6 @@ class ForgeCanvas {
 
         this.dragging = false;
         this.dragged_just_now = false;
-        this.resizing = false;
         this.drawing = false;
         this.contrast_pattern = null;
 
@@ -378,31 +377,6 @@ class ForgeCanvas {
             drawingCanvas.style.cursor = "";
             container.style.cursor = "";
             scribbleIndicator.style.display = "none";
-        });
-
-        const resizeLine = document.getElementById(`resizeLine_${self.uuid}`);
-        resizeLine.addEventListener("pointerdown", (e) => {
-            self.resizing = true;
-            e.preventDefault();
-            e.stopPropagation();
-        });
-
-        document.addEventListener("pointermove", (e) => {
-            if (self.resizing) {
-                const rect = container.getBoundingClientRect();
-                const newHeight = e.clientY - rect.top;
-                container.style.height = `${newHeight}px`;
-                e.preventDefault();
-                e.stopPropagation();
-            }
-        });
-
-        document.addEventListener("pointerup", () => {
-            self.resizing = false;
-        });
-
-        document.addEventListener("pointerout", () => {
-            self.resizing = false;
         });
 
         function preventDefaults(e) {
@@ -835,6 +809,3 @@ class ForgeCanvas {
         drawingCanvas.style.cursor = "grab";
     }
 }
-
-const True = true;
-const False = false;
