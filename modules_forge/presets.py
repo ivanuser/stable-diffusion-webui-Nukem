@@ -127,6 +127,17 @@ def register(options_templates: dict, options_section: Callable, OptionInfo: "Op
 
     options_templates.update(
         options_section(
+            ("ui_lumina", "LUMINA", "presets"),
+            {
+                "lumina_t2i_d_cfg": OptionInfo(6.0, "txt2img Shift", gr.Slider, {"minimum": 1, "maximum": 10, "step": 0.1}),
+                "lumina_t2i_hr_d_cfg": OptionInfo(6.0, "txt2img Hires. Shift", gr.Slider, {"minimum": 1, "maximum": 10, "step": 0.1}),
+                "lumina_i2i_d_cfg": OptionInfo(6.0, "img2img Shift", gr.Slider, {"minimum": 1, "maximum": 10, "step": 0.1}),
+            },
+        )
+    )
+
+    options_templates.update(
+        options_section(
             ("ui_wan", "WAN", "presets"),
             {
                 "wan_t2i_d_cfg": OptionInfo(8.0, "txt2img Shift", gr.Slider, {"minimum": 1, "maximum": 10, "step": 0.1}),

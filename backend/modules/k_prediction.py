@@ -318,10 +318,10 @@ class PredictionDiscreteFlow(AbstractPrediction):
         sampling_settings: dict = model_config.sampling_settings
         self.set_parameters(shift=sampling_settings.get("shift", 1.0), multiplier=sampling_settings.get("multiplier", 1000))
 
-    def set_parameters(self, shift=1.0, timesteps=1000, multiplier=1000):
-        self.shift = shift
-        self.multiplier = multiplier
-        ts = self.sigma((torch.arange(1, timesteps + 1, 1) / timesteps) * multiplier)
+    def set_parameters(self, *, shift=None, multiplier=None, timesteps=1000):
+        self.shift = shift or self.shift
+        self.multiplier = multiplier or self.multiplier
+        ts = self.sigma((torch.arange(1, timesteps + 1, 1) / timesteps) * self.multiplier)
         self.register_buffer("sigmas", ts)
 
     @property
