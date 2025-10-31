@@ -809,3 +809,6 @@ class ForgeCanvas {
         drawingCanvas.style.cursor = "grab";
     }
 }
+
+const True = true;
+const False = false;
