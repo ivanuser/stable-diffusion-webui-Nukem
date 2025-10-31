@@ -727,10 +727,10 @@ def create_infotext(p, all_prompts, all_seeds, all_subseeds, comments=None, iter
         "CFG scale": p.cfg_scale,
     }
 
-    # if hires fix was used, p.firstpass_use_distilled_cfg_scale is appropriately set, otherwise it doesn't exist
-    firstpass_use_distilled_cfg_scale = getattr(p, "firstpass_use_distilled_cfg_scale", p.sd_model.use_distilled_cfg_scale)
-    if firstpass_use_distilled_cfg_scale:
+    if p.sd_model.use_distilled_cfg_scale:
         generation_params["Distilled CFG Scale"] = p.distilled_cfg_scale
+    if p.sd_model.use_shift:
+        generation_params["Shift"] = p.distilled_cfg_scale
 
     noise_source_type = get_noise_source_type()
 
@@ -1418,7 +1418,6 @@ class StableDiffusionProcessingTxt2Img(StableDiffusionProcessing):
         if self.hr_checkpoint_name and self.hr_checkpoint_name != "Use same checkpoint":
             checkpoint_changed = main_entry.checkpoint_change(self.hr_checkpoint_name, preset=None, save=False, refresh=False)
             if checkpoint_changed:
-                self.firstpass_use_distilled_cfg_scale = self.sd_model.use_distilled_cfg_scale
                 reload = True
 
         if reload:

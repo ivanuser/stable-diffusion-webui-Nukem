@@ -53,6 +53,7 @@ class ForgeDiffusionEngine:
         self.first_stage_model = None
         self.cond_stage_model = None
         self.use_distilled_cfg_scale = False
+        self.use_shift = False
         self.is_sd1 = False
         self.is_sdxl = False
         self.is_flux = False  # affects the usage of TAESD

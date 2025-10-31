@@ -398,6 +398,9 @@ def parse_generation_parameters(x: str, skip_fields: list[str] | None = None):
     if "Refiner switch by sampling steps" not in res:
         res["Refiner switch by sampling steps"] = False
 
+    if "Shift" in res:
+        res["Distilled CFG Scale"] = res.pop("Shift")
+
     infotext_versions.backcompat(res)
 
     for key in skip_fields:
