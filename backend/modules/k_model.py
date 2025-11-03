@@ -50,7 +50,7 @@ class KModel(torch.nn.Module):
         return self.predictor.calculate_denoised(sigma, model_output, x)
 
     def memory_required(self, input_shape: list[int]) -> float:
-        """https://github.com/comfyanonymous/ComfyUI/blob/v0.3.56/comfy/model_base.py#L350"""
+        """https://github.com/comfyanonymous/ComfyUI/blob/v0.3.64/comfy/model_base.py#L354"""
         input_shapes = [input_shape]
         area = sum(map(lambda input_shape: input_shape[0] * math.prod(input_shape[2:]), input_shapes))
 

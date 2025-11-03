@@ -1,4 +1,5 @@
-# https://github.com/QwenLM/Qwen-Image (Apache 2.0)
+# https://github.com/comfyanonymous/ComfyUI/blob/v0.3.64/comfy/ldm/qwen_image/model.py
+# Reference: https://github.com/QwenLM/Qwen-Image
 
 import math
 from typing import Optional, Tuple

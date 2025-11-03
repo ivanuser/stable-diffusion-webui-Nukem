@@ -1,6 +1,6 @@
-# Single File Implementation of Flux with aggressive optimizations, Copyright Forge 2024
-# If used outside Forge, only non-commercial use is allowed.
-# See also https://github.com/black-forest-labs/flux
+# implementation of Flux for Forge
+# Copyright Forge 2024
+# Reference: https://github.com/black-forest-labs/flux
 
 
 import math

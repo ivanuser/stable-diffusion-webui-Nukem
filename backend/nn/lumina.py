@@ -1,4 +1,5 @@
-# https://github.com/Alpha-VLLM/Lumina-Image-2.0/blob/main/models/model.py
+# https://github.com/comfyanonymous/ComfyUI/blob/v0.3.64/comfy/ldm/lumina/model.py
+# Reference: https://github.com/Alpha-VLLM/Lumina-Image-2.0
 
 import math
 

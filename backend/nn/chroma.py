@@ -1,4 +1,6 @@
-# implementation of Chroma for Forge, inspired by https://github.com/lodestone-rock/ComfyUI_FluxMod
+# implementation of Chroma for Forge
+# Credit:    croquelois
+# Reference: https://github.com/lodestone-rock/ComfyUI_FluxMod
 
 from dataclasses import dataclass
 

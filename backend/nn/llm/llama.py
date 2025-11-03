@@ -1,3 +1,5 @@
+# https://github.com/comfyanonymous/ComfyUI/blob/v0.3.64/comfy/text_encoders/llama.py
+
 import math
 from dataclasses import asdict, dataclass
 from typing import Optional

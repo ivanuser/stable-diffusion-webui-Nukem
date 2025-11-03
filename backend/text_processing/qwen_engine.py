@@ -1,3 +1,6 @@
+# https://github.com/comfyanonymous/ComfyUI/blob/v0.3.64/comfy/sd1_clip.py
+# https://github.com/comfyanonymous/ComfyUI/blob/v0.3.64/comfy/text_encoders/qwen_image.py
+
 import torch
 
 from backend import memory_management

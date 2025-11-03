@@ -311,7 +311,7 @@ class PredictionFlux(AbstractPrediction):
 
 
 class PredictionDiscreteFlow(AbstractPrediction):
-    """https://github.com/comfyanonymous/ComfyUI/blob/v0.3.50/comfy/model_sampling.py#L243"""
+    """https://github.com/comfyanonymous/ComfyUI/blob/v0.3.64/comfy/model_sampling.py#L243"""
 
     def __init__(self, model_config):
         super().__init__(sigma_data=None, prediction_type="const")
