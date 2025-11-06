@@ -1029,6 +1029,11 @@ def process_images_inner(p: StableDiffusionProcessing) -> Processed:
                 x_samples_ddim = batch_params.images
 
             def infotext(index=0, use_main_prompt=False):
+                if opts.save_prompt_comments:
+                    _prompts = p._all_prompts_c[n * p.batch_size : (n + 1) * p.batch_size]
+                    _negative_prompts = p._all_negative_prompts_c[n * p.batch_size : (n + 1) * p.batch_size]
+                    return create_infotext(p, _prompts, p.seeds, p.subseeds, use_main_prompt=False, index=index, all_negative_prompts=_negative_prompts)
+
                 return create_infotext(p, p.prompts, p.seeds, p.subseeds, use_main_prompt=use_main_prompt, index=index, all_negative_prompts=p.negative_prompts)
 
             save_samples = p.save_samples(is_video=_is_video)
