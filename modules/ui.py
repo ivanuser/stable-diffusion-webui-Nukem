@@ -13,6 +13,7 @@ import numpy as np
 from PIL import Image, PngImagePlugin  # noqa: F401
 
 import modules.infotext_utils as parameters_copypaste
+import modules.processing_scripts.comments as comments
 from modules import gradio_extensons, launch_utils  # noqa: F401
 from modules import extra_networks, extras, paths_internal, processing, progress, prompt_parser, script_callbacks, scripts, sd_models, sd_samplers, sd_schedulers, shared, shared_items, sysinfo, timer, ui_common, ui_extensions, ui_extra_networks, ui_loadsave, ui_postprocessing, ui_settings, ui_toprow
 from modules.call_queue import wrap_gradio_call, wrap_gradio_gpu_call, wrap_queued_call
@@ -97,6 +98,8 @@ def update_token_counter(text, steps, styles, *, is_positive=True):
     if shared.opts.include_styles_into_token_counters:
         apply_styles = shared.prompt_styles.apply_styles_to_prompt if is_positive else shared.prompt_styles.apply_negative_styles_to_prompt
         text = apply_styles(text, styles)
+
+    text = comments.strip_comments(text).strip()
 
     try:
         text, _ = extra_networks.parse_prompt(text)

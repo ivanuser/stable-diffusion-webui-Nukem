@@ -1,15 +1,20 @@
 import re
 from typing import TYPE_CHECKING
 
-from modules import script_callbacks, scripts, shared
+from modules import scripts, shared
 
 if TYPE_CHECKING:
     from modules.processing import StableDiffusionProcessing
 
 
-def strip_comments(text):
-    text = re.sub("(^|\n)#[^\n]*(\n|$)", "\n", text)  # while line comment
-    text = re.sub("#[^\n]*(\n|$)", "\n", text)  # in the middle of the line comment
+def strip_comments(text: str) -> str:
+    if not shared.opts.enable_prompt_comments:
+        return text
+
+    # multi line comment (/* */)
+    text = re.sub(r"\/\*.*?\*\/", "", text, flags=re.DOTALL)
+    # single line comment (# | //)
+    text = re.sub(r"[^\S\n]*(\#|\/\/).*", "", text)
 
     return text
 
@@ -25,6 +30,10 @@ class ScriptComments(scripts.Script):
         if not shared.opts.enable_prompt_comments:
             return
 
+        if shared.opts.save_prompt_comments:
+            p._all_prompts_c = p.all_prompts.copy()
+            p._all_negative_prompts_c = p.all_negative_prompts.copy()
+
         p.all_prompts = [strip_comments(x) for x in p.all_prompts]
         p.all_negative_prompts = [strip_comments(x) for x in p.all_negative_prompts]
 
@@ -39,19 +48,21 @@ class ScriptComments(scripts.Script):
             p.hr_negative_prompt = strip_comments(p.hr_negative_prompt)
 
 
-def before_token_counter(params: script_callbacks.BeforeTokenCounterParams):
-    if not shared.opts.enable_prompt_comments:
-        return
-
-    params.prompt = strip_comments(params.prompt)
-
-
-script_callbacks.on_before_token_counter(before_token_counter)
-
-
 shared.options_templates.update(
     shared.options_section(
-        ("ui_alternatives", "UI Alternatives", "ui"),
-        {"enable_prompt_comments": shared.OptionInfo(True, "Enable Comments").info("Ignore the texts between # and the end of the line from the prompts")},
+        ("ui_comments", "Comments", "ui"),
+        {
+            "enable_prompt_comments": shared.OptionInfo(True, "Remove Comments from Prompts").html(
+                """
+<b>Comment Syntax:</b><br>
+<ul style='margin-left: 2em'>
+<li># ...</li>
+<li>// ...</li>
+<li>/* ... */</li>
+</ul>
+                """
+            ),
+            "save_prompt_comments": shared.OptionInfo(False, "Save Raw Comments").info("include the comments in Infotext"),
+        },
     )
 )
