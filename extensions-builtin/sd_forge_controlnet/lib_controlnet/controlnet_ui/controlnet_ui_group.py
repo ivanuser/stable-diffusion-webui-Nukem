@@ -517,7 +517,7 @@ class ControlNetUiGroup(object):
             if image is not None:
                 return closesteight(image.shape[1]), closesteight(image.shape[0])
             else:
-                return gr.Slider.update(), gr.Slider.update()
+                return gr.skip(), gr.skip()
 
         self.send_dimen_button.click(
             fn=send_dimensions,
@@ -529,7 +529,7 @@ class ControlNetUiGroup(object):
     def register_refresh_all_models(self):
         def refresh_all_models():
             global_state.update_controlnet_filenames()
-            return gr.Dropdown.update(
+            return gr.update(
                 choices=global_state.get_all_controlnet_names(),
             )
 
@@ -598,13 +598,13 @@ class ControlNetUiGroup(object):
             if self.prevent_next_n_module_update > 0:
                 self.prevent_next_n_module_update -= 1
                 return [
-                    gr.Dropdown.update(choices=filtered_preprocessor_list),
-                    gr.Dropdown.update(choices=filtered_controlnet_names),
+                    gr.update(choices=filtered_preprocessor_list),
+                    gr.update(choices=filtered_controlnet_names),
                 ]
             else:
                 return [
-                    gr.Dropdown.update(value=default_preprocessor, choices=filtered_preprocessor_list),
-                    gr.Dropdown.update(value=default_controlnet_name, choices=filtered_controlnet_names),
+                    gr.update(value=default_preprocessor, choices=filtered_preprocessor_list),
+                    gr.update(value=default_controlnet_name, choices=filtered_controlnet_names),
                 ]
 
         self.type_filter.change(
@@ -620,7 +620,7 @@ class ControlNetUiGroup(object):
                 return (
                     gr.update(visible=True),
                     None,
-                    gr.update(),
+                    gr.skip(),
                     *self.openpose_editor.update(""),
                 )
 
@@ -711,13 +711,13 @@ class ControlNetUiGroup(object):
         def shift_preview(is_on):
             return (
                 # generated_image
-                gr.update() if is_on else gr.update(value=None),
+                gr.skip() if is_on else gr.update(value=None),
                 # generated_image_group
                 gr.update(visible=is_on),
                 # use_preview_as_input,
                 gr.update(visible=False),  # Now this is automatically managed
                 # download_pose_link
-                gr.update() if is_on else gr.update(value=None),
+                gr.skip() if is_on else gr.update(value=None),
             )
 
         self.preprocessor_preview.change(

@@ -854,7 +854,7 @@ def image_data(data):
     except Exception:
         pass
 
-    return gr.update(), None
+    return gr.skip(), None
 
 
 def flatten(img, bgcolor):

@@ -19,7 +19,7 @@ sys.modules["modules.generation_parameters_copypaste"] = sys.modules[__name__]  
 re_param_code = r'\s*(\w[\w \-/]+):\s*("(?:\\.|[^\\"])+"|[^,]*)(?:,|$)'
 re_param = re.compile(re_param_code)
 re_imagesize = re.compile(r"^(\d+)x(\d+)$")
-type_of_gr_update = type(gr.update())
+type_of_gr_update = type(gr.skip())
 
 
 class ParamBinding:
@@ -217,8 +217,8 @@ def send_image_and_dimensions(x):
         w = img.width
         h = img.height
     else:
-        w = gr.update()
-        h = gr.update()
+        w = gr.skip()
+        h = gr.skip()
 
     return img, w, h
 
@@ -580,7 +580,7 @@ def connect_paste(button, paste_fields, input_comp, override_settings_component,
                 v = params.get(key, None)
 
             if v is None:
-                res.append(gr.update())
+                res.append(gr.skip())
             elif isinstance(v, type_of_gr_update):
                 res.append(v)
             else:
@@ -596,7 +596,7 @@ def connect_paste(button, paste_fields, input_comp, override_settings_component,
 
                     res.append(gr.update(value=val))
                 except Exception:
-                    res.append(gr.update())
+                    res.append(gr.skip())
 
         return res
 
@@ -608,7 +608,7 @@ def connect_paste(button, paste_fields, input_comp, override_settings_component,
 
             vals_pairs = [f"{infotext_text}: {value}" for infotext_text, setting_name, value in vals]
 
-            return gr.Dropdown.update(value=vals_pairs, choices=vals_pairs, visible=bool(vals_pairs))
+            return gr.update(value=vals_pairs, choices=vals_pairs, visible=bool(vals_pairs))
 
         paste_fields = paste_fields + [(override_settings_component, paste_settings)]
 

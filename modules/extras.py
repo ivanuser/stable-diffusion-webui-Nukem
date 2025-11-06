@@ -67,7 +67,7 @@ def run_modelmerger(id_task, primary_model_name, secondary_model_name, tertiary_
     def fail(message):
         shared.state.textinfo = message
         shared.state.end()
-        return [*[gr.update() for _ in range(4)], message]
+        return [*[gr.skip() for _ in range(4)], message]
 
     def weighted_sum(theta0, theta1, alpha):
         return ((1 - alpha) * theta0) + (alpha * theta1)
