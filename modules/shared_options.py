@@ -424,6 +424,17 @@ options_templates.update(
             "show_mahiro": OptionInfo(False, "Display the MaHiRo Toggle").info('see <a href="https://huggingface.co/spaces/yoinked/blue-arxiv">blue-arxiv</a> - <b>id:</b> <ins>2024-1208.1</ins>').needs_reload_ui(),
             "paste_safe_guard": OptionInfo(False, 'Disable the "Read generation parameters" button (↙️) when negative prompt is not empty'),
             "ctrl_enter_interrupt": OptionInfo(False, "Revert [Ctrl + Enter] to only interrupt the generation").info('the current "intended" behavior is to interrupt the current generation then immediately start a new one'),
+            "quicksettings_accordion": OptionInfo(False, "Place the Quicksettings under an Accordion").needs_reload_ui(),
+            "quicksettings_style": OptionInfo("default", "Quicksettings Style", gr.Radio, {"choices": ("default", "clip-modules", "scrollbar")}).needs_reload_ui(),
+            "qs_style_exp": OptionHTML(
+                """
+<ul>
+<li><b>default:</b> Same as the original Webui - excess elements get pushed into a new row</li>
+<li><b>clip-modules:</b> Display the full name of the modules only when hovering the "VAE / Text Encoder" dropdown</li>
+<li><b>scrollbar:</b> Keep all elements within the same row, showing a scrollbar if necessary</li>
+</ul>
+                """.strip()
+            ),
             "div_classic": OptionDiv(),
             "compact_prompt_box": OptionInfo(False, "Compact Prompt Layout").info("put prompts inside the Generate tab, leaving more space for the gallery").needs_reload_ui(),
             "dimensions_and_batch_together": OptionInfo(True, "Show Width/Height and Batch sliders in same row").needs_reload_ui(),
