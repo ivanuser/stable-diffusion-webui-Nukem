@@ -435,6 +435,7 @@ options_templates.update(
 </ul>
                 """.strip()
             ),
+            "forbidden_knowledge": OptionInfo(False, "Forbidden Knowledge").needs_restart(),
             "div_classic": OptionDiv(),
             "compact_prompt_box": OptionInfo(False, "Compact Prompt Layout").info("put prompts inside the Generate tab, leaving more space for the gallery").needs_reload_ui(),
             "dimensions_and_batch_together": OptionInfo(True, "Show Width/Height and Batch sliders in same row").needs_reload_ui(),
