@@ -19,6 +19,7 @@ from nunchaku.ops.fused import fused_gelu_mlp
 from nunchaku.utils import load_state_dict_in_safetensors
 
 from backend.args import dynamic_args
+from backend.nn._qwen_lora import compose_loras_v2, reset_lora_v2
 from backend.utils import process_img
 from modules import shared
 
@@ -578,6 +579,9 @@ class NunchakuQwenImageTransformer2DModel(NunchakuModelMixin, QwenImageTransform
             num_blocks_on_gpu=shared.opts.svdq_num_blocks_on_gpu,
         )
 
+        self.loras = []
+        self._applied_loras = []
+
     def forward(
         self,
         x,
@@ -647,6 +651,22 @@ class NunchakuQwenImageTransformer2DModel(NunchakuModelMixin, QwenImageTransform
 
         if guidance is not None:
             guidance = guidance * 1000
+
+        if self.loras != self._applied_loras:
+            self._applied_loras = self.loras.copy()
+
+            reset_lora_v2(self)
+            self.set_offload(False, None, None)
+
+            print("[Qwen] Composing LoRAs...")
+            compose_loras_v2(self, self.loras)
+            print("[Qwen] LoRAs Composed~")
+
+            self.set_offload(
+                offload=shared.opts.svdq_cpu_offload,
+                use_pin_memory=shared.opts.svdq_use_pin_memory,
+                num_blocks_on_gpu=shared.opts.svdq_num_blocks_on_gpu,
+            )
 
         temb = self.time_text_embed(timestep, hidden_states) if guidance is None else self.time_text_embed(timestep, guidance, hidden_states)
 
