@@ -93,6 +93,8 @@ class ForgeCanvas {
         this._held_W = false;
         this._held_A = false;
         this._held_S = false;
+
+        this._original_alpha = null;
     }
 
     init() {
@@ -157,6 +159,7 @@ class ForgeCanvas {
 
         if (self.no_scribbles) {
             toolbar.querySelector(".forge-toolbar-box-b").style.display = "none";
+            toolbar.removeAttribute("title");
             resetButton.style.display = "none";
             undoButton.style.display = "none";
             redoButton.style.display = "none";
@@ -423,6 +426,15 @@ class ForgeCanvas {
 
         document.addEventListener("keydown", (e) => {
             if (!self.pointerInsideContainer) return;
+            if (e.shiftKey) {
+                e.preventDefault();
+                if (this._original_alpha === null)
+                    this._original_alpha = scribbleAlpha.value;
+                scribbleAlpha.value = 0.0;
+                updateInput(scribbleAlpha);
+                scribbleIndicator.style.border = "2px dotted";
+                return;
+            }
             if (e.ctrlKey && e.key === "z") {
                 e.preventDefault();
                 this.undo();
@@ -457,6 +469,13 @@ class ForgeCanvas {
             this._held_W = false;
             this._held_A = false;
             this._held_S = false;
+
+            if (this._original_alpha !== null) {
+                scribbleAlpha.value = this._original_alpha;
+                this._original_alpha = null;
+                updateInput(scribbleAlpha);
+                scribbleIndicator.style.border = "1px solid";
+            }
         });
 
         maxButton.addEventListener("click", () => {
