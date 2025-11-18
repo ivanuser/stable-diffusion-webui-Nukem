@@ -483,7 +483,6 @@ options_templates.update(
             "add_vae_hash_to_info": OptionInfo(True, "Add VAE hash to infotext"),
             "add_user_name_to_info": OptionInfo(False, "Add user name to infotext when authenticated"),
             "add_version_to_infotext": OptionInfo(True, "Add webui version to infotext"),
-            "disable_weights_auto_swap": OptionInfo(True, "Ignore checkpoint information when reading infotext"),
             "infotext_skip_pasting": OptionInfo([], "Ignore fields when reading infotext", ui_components.DropdownMulti, lambda: {"choices": shared_items.get_infotext_names()}),
             "infotext_styles": OptionInfo("Apply if any", "Infer Styles when reading infotext", gr.Radio, {"choices": ("Ignore", "Apply", "Apply if any", "Discard")}).html(
                 """
