@@ -23,7 +23,7 @@ class QwenImage(ForgeDiffusionEngine):
         super().__init__(estimated_config, huggingface_components)
         self.is_inpaint = False
 
-        clip = CLIP(model_dict={"qwen25": huggingface_components["text_encoder"]}, tokenizer_dict={"qwen25": huggingface_components["tokenizer"]})
+        clip = CLIP(model_dict={"qwen25_7b": huggingface_components["text_encoder"]}, tokenizer_dict={"qwen25_7b": huggingface_components["tokenizer"]})
 
         vae = VAE(model=huggingface_components["vae"], is_wan=True)
         vae.first_stage_model.latent_format = self.model_config.latent_format
@@ -33,8 +33,8 @@ class QwenImage(ForgeDiffusionEngine):
         unet = UnetPatcher.from_model(model=huggingface_components["transformer"], diffusers_scheduler=None, k_predictor=k_predictor, config=estimated_config)
 
         self.text_processing_engine_qwen = QwenTextProcessingEngine(
-            text_encoder=clip.cond_stage_model.qwen25,
-            tokenizer=clip.tokenizer.qwen25,
+            text_encoder=clip.cond_stage_model.qwen25_7b,
+            tokenizer=clip.tokenizer.qwen25_7b,
         )
 
         self.forge_objects = ForgeObjects(unet=unet, clip=clip, vae=vae, clipvision=None)

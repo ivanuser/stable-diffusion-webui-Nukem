@@ -428,7 +428,7 @@ class QwenImage(BASE):
         return ModelType.FLOW
 
     def clip_target(self, state_dict: dict):
-        return {"qwen25": "text_encoder"}
+        return {"qwen25_7b": "text_encoder"}
 
 
 models = [

@@ -533,7 +533,7 @@ def replace_state_dict(sd: dict[str, torch.Tensor], asd: dict[str, torch.Tensor]
         weight = asd["model.layers.0.self_attn.k_proj.bias"]
         assert weight.shape[0] == 512
         for k, v in asd.items():
-            sd[f"{text_encoder_key_prefix}qwen25.{k}"] = v
+            sd[f"{text_encoder_key_prefix}qwen25_7b.{k}"] = v
 
     if "model.layers.0.post_feedforward_layernorm.weight" in asd:
         assert "model.layers.0.self_attn.q_norm.weight" not in asd
