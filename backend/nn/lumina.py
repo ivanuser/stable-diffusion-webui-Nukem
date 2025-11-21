@@ -403,6 +403,12 @@ class NextDiT(nn.Module):
 
         return padded_full_embed, mask, img_sizes, l_effective_cap_len, freqs_cis
 
+    @staticmethod
+    def load_tokens(transformer_options: dict) -> int:
+        opt: list[int] = transformer_options.get("cond_or_uncond", [0])
+        c_uc: str = "c" if opt[0] == 0 else "uc"
+        return dynamic_args["num_tokens"][c_uc]
+
     def forward(self, x, timesteps, context, num_tokens=None, attention_mask=None, **kwargs):
         t = 1.0 - timesteps
         cap_feats = context
@@ -416,9 +422,7 @@ class NextDiT(nn.Module):
         cap_feats = self.cap_embedder(cap_feats)
 
         transformer_options = kwargs.get("transformer_options", {})
-
-        _c = transformer_options.get("cond_or_uncond", [0])[0]
-        num_tokens = num_tokens or dynamic_args["num_tokens"][_c]
+        num_tokens = num_tokens or self.load_tokens(transformer_options)
 
         x_is_tensor = isinstance(x, torch.Tensor)
         x, mask, img_size, cap_size, freqs_cis = self.patchify_and_embed(x, cap_feats, cap_mask, t, num_tokens, transformer_options=transformer_options)

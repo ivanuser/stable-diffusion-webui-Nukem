@@ -1172,7 +1172,6 @@ def process_images_inner(p: StableDiffusionProcessing) -> Processed:
         p.scripts.postprocess(p, res)
 
     dynamic_args.pop("ref_latents", None)
-    dynamic_args.pop("num_tokens", None)
     return res
 
 

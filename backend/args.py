@@ -123,5 +123,6 @@ parser.add_argument("--sage-accum-dtype", type=Sage_pv_accum_dtype, default=Sage
 
 args, _ = parser.parse_known_args()
 
-dynamic_args = dict(embedding_dir="./embeddings", emphasis_name="original")
+# TODO: Stop using this to hack every problem...
+dynamic_args = dict(embedding_dir="./embeddings", emphasis_name="original", num_tokens={"c": None, "uc": None})
 """Some parameters that are changed by the Webui"""

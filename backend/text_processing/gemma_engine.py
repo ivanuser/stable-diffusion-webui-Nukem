@@ -114,7 +114,7 @@ class GemmaTextProcessingEngine:
                     #     tokens += [self.id_pad] * remaining_count
                     #     multipliers += [1.0] * remaining_count
 
-                    z = self.process_tokens([tokens], [multipliers])[0]
+                    z = self.process_tokens([tokens], [multipliers], texts.is_negative_prompt)[0]
                     line_z_values.append(z)
                 cache[line] = line_z_values
 
@@ -155,9 +155,9 @@ class GemmaTextProcessingEngine:
 
         return torch.cat(embeds_out), torch.tensor(attention_masks, device=device, dtype=torch.long), num_tokens
 
-    def process_tokens(self, batch_tokens, batch_multipliers):
+    def process_tokens(self, batch_tokens, batch_multipliers, negative: bool):
         embeds, mask, count = self.process_embeds(batch_tokens)
-        dynamic_args["num_tokens"] = [max(1, torch.sum(mask).item())] + dynamic_args.get("num_tokens", [])
+        dynamic_args["num_tokens"]["uc" if negative else "c"] = int(max(1, torch.sum(mask).item()))
         _, z = self.text_encoder(
             None,
             attention_mask=mask,
