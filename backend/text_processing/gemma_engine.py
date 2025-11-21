@@ -37,12 +37,6 @@ class GemmaTextProcessingEngine:
         tokenized = self.tokenizer(texts, truncation=False, add_special_tokens=False)["input_ids"]
         return tokenized
 
-    def encode_with_transformers(self, tokens):
-        device = memory_management.text_encoder_device()
-        tokens = tokens.to(device)
-        self.text_encoder.to(device)
-        return self.text_encoder(tokens)
-
     def tokenize_line(self, line):
         parsed = parsing.parse_prompt_attention(line, self.emphasis.name)
 
