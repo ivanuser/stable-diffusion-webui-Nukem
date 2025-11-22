@@ -39,4 +39,4 @@ torchdiffeq==0.2.5
 torchsde==0.2.6
 tqdm==4.67.1
 transformers==4.56.2
-torch<2.9.0
+torch
