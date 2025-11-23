@@ -428,7 +428,12 @@ class QwenImage(BASE):
         return ModelType.FLOW
 
     def clip_target(self, state_dict: dict):
-        return {"qwen25_7b": "text_encoder"}
+        pref = self.text_encoder_key_prefix[0]
+        if "{}.qwen25_7b.transformer.model.embed_tokens.weight".format(pref) in state_dict:
+            state_dict.pop("{}qwen25_7b.logit_scale".format(pref), None)
+            return {"qwen25_7b.transformer": "text_encoder"}
+        else:
+            return {"qwen25_7b": "text_encoder"}
 
 
 models = [
