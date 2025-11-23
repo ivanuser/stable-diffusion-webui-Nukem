@@ -762,3 +762,19 @@ class NunchakuQwenImageTransformer2DModel(NunchakuModelMixin, QwenImageTransform
             self.offload_manager = None
             gc.collect()
             torch.cuda.empty_cache()
+
+    def load_state_dict(self, sd, *args, **kwargs):
+        state_dict = self.state_dict()
+        for k in state_dict.keys():
+            if k not in sd:
+                if "dummy" in k:
+                    continue
+                if ".wcscales" not in k:
+                    raise ValueError(f"Key {k} not found in state_dict")
+                sd[k] = torch.ones_like(state_dict[k])
+        for n, m in self.named_modules():
+            if isinstance(m, SVDQW4A4Linear):
+                if m.wtscale is not None:
+                    m.wtscale = sd.pop(f"{n}.wtscale", 1.0)
+
+        return super().load_state_dict(sd, *args, **kwargs)
