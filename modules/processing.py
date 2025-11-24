@@ -23,7 +23,6 @@ import modules.sd_models as sd_models
 import modules.sd_vae as sd_vae
 import modules.shared as shared
 from backend import memory_management
-from backend.args import dynamic_args
 from backend.modules.k_prediction import rescale_zero_terminal_snr_sigmas
 from modules import devices, errors, extra_networks, images, infotext_utils, masking, profiling, prompt_parser, rng, scripts, sd_samplers, sd_samplers_common, sd_unet, sd_vae_approx
 from modules.rng import get_noise_source_type, slerp  # noqa: F401
@@ -375,7 +374,7 @@ class StableDiffusionProcessing:
         self.sampler = None
         self.c = None
         self.uc = None
-        if not (opts.persistent_cond_cache and self.sd_model.is_webui_legacy_model()):
+        if not opts.persistent_cond_cache:
             StableDiffusionProcessing.cached_c = [None, None]
             StableDiffusionProcessing.cached_uc = [None, None]
 
@@ -1171,7 +1170,6 @@ def process_images_inner(p: StableDiffusionProcessing) -> Processed:
     if p.scripts is not None:
         p.scripts.postprocess(p, res)
 
-    dynamic_args.pop("ref_latents", None)
     return res
 
 
@@ -1552,7 +1550,7 @@ class StableDiffusionProcessingTxt2Img(StableDiffusionProcessing):
         super().close()
         self.hr_c = None
         self.hr_uc = None
-        if not (opts.persistent_cond_cache and self.sd_model.is_webui_legacy_model()):
+        if not opts.persistent_cond_cache:
             StableDiffusionProcessingTxt2Img.cached_hr_uc = [None, None]
             StableDiffusionProcessingTxt2Img.cached_hr_c = [None, None]
 
