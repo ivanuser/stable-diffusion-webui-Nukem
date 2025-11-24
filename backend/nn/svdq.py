@@ -24,7 +24,7 @@ from backend.utils import process_img
 from modules import shared
 
 
-class NunchakuModelMixin:
+class NunchakuModelMixin(nn.Module):
     offload: bool = False
 
     def set_offload(self, offload: bool, use_pin_memory: bool, num_blocks_on_gpu: int):
