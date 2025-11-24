@@ -1219,3 +1219,31 @@ def unload_all_models():
     free_memory(float("inf"), get_torch_device(), free_all=True)
     if vram_state != VRAMState.HIGH_VRAM:
         free_memory(float("inf"), torch.device("cpu"), free_all=True)
+
+
+# https://github.com/comfyanonymous/ComfyUI/blob/v0.3.71/comfy/ops.py#L58
+NVIDIA_CONV3D_WORKAROUND = False
+try:
+    if is_nvidia():
+        cudnn_version = torch.backends.cudnn.version()
+        torch_version = str(torch.version.__version__)
+        if (cudnn_version >= 91002 and cudnn_version < 91500) and (int(torch_version[0]) >= 2 and int(torch_version[2]) >= 9 and int(torch_version[2]) <= 10):
+            NVIDIA_CONV3D_WORKAROUND = True
+except Exception:
+    pass
+else:
+    from functools import wraps
+
+    _forward = torch.nn.Conv3d._conv_forward
+
+    @wraps(_forward)
+    def patched_forward(self, input, weight, bias, *args, **kwargs):
+        if NVIDIA_CONV3D_WORKAROUND and weight.dtype in (torch.float16, torch.bfloat16):
+            out = torch.cudnn_convolution(input, weight, self.padding, self.stride, self.dilation, self.groups, benchmark=False, deterministic=False, allow_tf32=True)
+            if bias is not None:
+                out += bias.reshape((1, -1) + (1,) * (out.ndim - 2))
+            return out
+        else:
+            return _forward(input, weight, bias, *args, **kwargs)
+
+    torch.nn.Conv3d._conv_forward = patched_forward
