@@ -1244,6 +1244,6 @@ else:
                 out += bias.reshape((1, -1) + (1,) * (out.ndim - 2))
             return out
         else:
-            return _forward(input, weight, bias, *args, **kwargs)
+            return _forward(self, input, weight, bias, *args, **kwargs)
 
     torch.nn.Conv3d._conv_forward = patched_forward
