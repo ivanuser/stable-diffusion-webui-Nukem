@@ -199,7 +199,7 @@ class UiSettings:
                     reload_script_bodies = gr.Button(value="Reload custom script bodies (No ui updates, No restart)", variant="secondary", elem_id="settings_reload_script_bodies")
                     with gr.Row():
                         unload_sd_model = gr.Button(value="Unload all models", elem_id="sett_unload_sd_model")
-                        # reload_sd_model = gr.Button(value='Load SD checkpoint to VRAM from RAM', elem_id="sett_reload_sd_model")
+                        list_loaded_model = gr.Button(value="List all currently loaded models", elem_id="sett_list_loaded_model")
                     with gr.Row():
                         calculate_all_checkpoint_hash = gr.Button(value="Calculate hash for all checkpoint", elem_id="calculate_all_checkpoint_hash")
                         calculate_all_checkpoint_hash_threads = gr.Number(value=1, label="Number of parallel calculations", elem_id="calculate_all_checkpoint_hash_threads", precision=0, minimum=1)
@@ -229,11 +229,7 @@ class UiSettings:
 
             unload_sd_model.click(fn=call_func_and_return_text(sd_models.unload_model_weights, "Unloaded all models"), inputs=[], outputs=[self.result])
 
-            # reload_sd_model.click(
-            #     fn=call_func_and_return_text(lambda: sd_models.send_model_to_device(shared.sd_model), 'Loaded the checkpoint'),
-            #     inputs=[],
-            #     outputs=[self.result]
-            # )
+            list_loaded_model.click(fn=call_func_and_return_text(sd_models.list_loaded_weights, "List all models"), inputs=[], outputs=[self.result])
 
             request_notifications.click(fn=lambda: None, inputs=[], outputs=[], _js="function(){}")
 

@@ -268,6 +268,31 @@ def unload_model_weights(sd_model=None, info=None):
     return
 
 
+def list_loaded_weights():
+    if len(memory_management.current_loaded_models) == 0:
+        return
+
+    from rich.console import Console
+    from rich.table import Table
+
+    table = Table(title="Currently Loaded Weights")
+    table.add_column("Model", justify="left")
+    table.add_column("VRAM", justify="right")
+    table.add_column("Device", justify="right")
+
+    for mdl in memory_management.current_loaded_models:
+        mdl.compute_inclusive_exclusive_memory()
+        table.add_row(
+            str(mdl.model.model.__class__.__name__),
+            f"{int(mdl.inclusive_memory / 2 ** 20)} (MB)" if mdl.inclusive_memory > 0 else "n.a.",
+            str(mdl.device),
+        )
+
+    print("")
+    console = Console()
+    console.print(table)
+
+
 def apply_token_merging(sd_model, token_merging_ratio):
     if token_merging_ratio > 0.0:
         from backend.misc.tomesd import TomePatcher
