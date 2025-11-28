@@ -1,5 +1,5 @@
-# https://github.com/comfyanonymous/ComfyUI/blob/v0.3.64/comfy/sd1_clip.py
-# https://github.com/comfyanonymous/ComfyUI/blob/v0.3.64/comfy/text_encoders/lumina2.py
+# https://github.com/comfyanonymous/ComfyUI/blob/v0.3.75/comfy/sd1_clip.py
+# https://github.com/comfyanonymous/ComfyUI/blob/v0.3.75/comfy/text_encoders/z_image.py
 
 from typing import TYPE_CHECKING
 
@@ -19,22 +19,21 @@ class PromptChunk:
         self.multipliers = []
 
 
-class GemmaTextProcessingEngine:
+class Qwen3TextProcessingEngine:
     def __init__(self, text_encoder, tokenizer):
         super().__init__()
 
         self.text_encoder = text_encoder
         self.tokenizer = tokenizer
 
-        self.id_start = 2
-        self.id_pad = 0
-
+        self.id_pad = 151643
+        self.llama_template = "<|im_start|>user\n{}<|im_end|>\n<|im_start|>assistant\n"
         self.intermediate_output = -2
         self.layer_norm_hidden_state = False
 
     def tokenize(self, texts):
-        tokenized = self.tokenizer(texts, truncation=False, add_special_tokens=False)["input_ids"]
-        return tokenized
+        llama_texts = [self.llama_template.format(text) for text in texts]
+        return self.tokenizer(llama_texts)["input_ids"]
 
     def tokenize_line(self, line):
         parsed = parsing.parse_prompt_attention(line, self.emphasis.name)
@@ -48,9 +47,6 @@ class GemmaTextProcessingEngine:
         def next_chunk():
             nonlocal token_count
             nonlocal chunk
-
-            chunk.tokens = [self.id_start] + chunk.tokens
-            chunk.multipliers = [1.0] + chunk.multipliers
 
             chunks.append(chunk)
             chunk = PromptChunk()
@@ -72,18 +68,6 @@ class GemmaTextProcessingEngine:
 
         return chunks, token_count
 
-    @staticmethod
-    def process_template(text: str, negative: bool) -> str:
-        if "<Prompt Start>" in text:
-            return text
-
-        from modules.shared import opts
-
-        if negative:
-            return "\n".join([opts.neta_template_negative, text])
-        else:
-            return "\n".join([opts.neta_template_positive, text])
-
     def __call__(self, texts: "SdConditioning"):
         zs = []
         cache = {}
@@ -91,8 +75,6 @@ class GemmaTextProcessingEngine:
         self.emphasis = emphasis.get_current_option(opts.emphasis)()
 
         for line in texts:
-            line = self.process_template(line, texts.is_negative_prompt)
-
             if line in cache:
                 line_z_values = cache[line]
             else:
