@@ -22,11 +22,15 @@ The name "Forge" is inspired by "Minecraft Forge". This project aims to become t
 
 <br>
 
-## Features [Oct. 29]
+## Features [Nov]
 > Most base features of the original [Automatic1111 Webui](https://github.com/AUTOMATIC1111/stable-diffusion-webui) should still function
 
 #### New Features
 
+> [!Tip]
+> [Download Models](https://github.com/Haoming02/sd-webui-forge-classic/wiki/Download-Models)
+
+- [X] Support [Z-Image-Turbo](https://huggingface.co/Tongyi-MAI/Z-Image-Turbo)
 - [X] Support [Wan 2.2](https://github.com/Wan-Video/Wan2.2)
     - `txt2img`, `img2img`, `txt2vid`, `img2vid`
     - use `Refiner` to achieve **High Noise** / **Low Noise** switching
@@ -51,12 +55,19 @@ The name "Forge" is inspired by "Minecraft Forge". This project aims to become t
 - [X] Support Multi-Image Inputs for **Qwen-Image-Edit** and **Flux-Kontext**
 - [X] Support [Nunchaku](https://github.com/nunchaku-tech/nunchaku) (`SVDQ`) Models
     - `flux-dev`, `flux-krea`, `flux-kontext`, `qwen-image`, `qwen-image-edit`, `t5`
+    - support LoRAs
 - [X] Support [Lumina-Image-2.0](https://huggingface.co/Alpha-VLLM/Lumina-Image-2.0)
     - `Neta-Lumina`, `NetaYume-Lumina`
 - [X] Support [Chroma](https://huggingface.co/lodestones/Chroma)
     - special thanks: [@croquelois](https://github.com/lllyasviel/stable-diffusion-webui-forge/pull/2925)
+
+> [!Tip]
+> Check out [Inference References](https://github.com/Haoming02/sd-webui-forge-classic/wiki/Inference-References) for how to use each model and the recommended parameters
+
+<br>
+
 - [X] Rewrite Preset System
-    - now actually remembers the checkpoint/module selection for each preset
+    - now actually remembers the checkpoint/module selection and parameters for each preset
 - [X] Support [uv](https://github.com/astral-sh/uv) package manager
     - requires **manually** installing [uv](https://github.com/astral-sh/uv/releases)
     - drastically speed up installation
@@ -109,10 +120,11 @@ The name "Forge" is inspired by "Minecraft Forge". This project aims to become t
 - [X] Remove redundant upscaler codes
     - put every upscaler inside the `ESRGAN` folder
 - [X] Improve `ForgeCanvas`
-    - hotkeys
     - brush adjustments
     - customization
     - deobfuscate
+    - eraser
+    - hotkeys
 - [X] Optimize upscaler logics
 - [X] Optimize certain operations in `Spandrel`
 - [X] Improve memory management
@@ -123,6 +135,9 @@ The name "Forge" is inspired by "Minecraft Forge". This project aims to become t
     - update descriptions
 - [X] Check for Extension updates in parallel
 - [X] Move `embeddings` folder into `models` folder
+- [X] ControlNet Rewrite
+    - change Units to `gr.Tab`
+    - remove multi-inputs, as they are "[misleading](https://github.com/lllyasviel/stable-diffusion-webui-forge/discussions/932)"
 - [X] Disable Refiner by default
     - enable again in **Settings/Refiner**
 - [X] Lint & Format
@@ -131,8 +146,8 @@ The name "Forge" is inspired by "Minecraft Forge". This project aims to become t
 - [X] Update `protobuf`
     - faster `insightface` loading
 - [X] Update to latest PyTorch
-    - `torch==2.8.0+cu128`
-    - `xformers==0.0.32`
+    - `torch==2.9.1+cu128`
+    - `xformers==0.0.33`
 
 > [!Note]
 > If your GPU does not support the latest PyTorch, manually [install](#install-older-pytorch) older version of PyTorch
@@ -365,16 +380,13 @@ In my experience, the speed of each attention function for SDXL is ranked in the
 > [!Note]
 > `SageAttention` is based on quantization, so its quality might be slightly worse than others
 
-> [!Important]
-> When using `SageAttention 2`, both positive prompts and negative prompts are required; omitting negative prompts can cause `NaN` issues
-
 <br>
 
 ## Issues & Requests
 
 - **Issues** about removed features will simply be ignored
 - **Issues** regarding installation will be ignored if it's obviously user-error
-- Non-Windows platforms will not be supported, as I cannot verify nor maintain them
+- Non-Windows platforms will not be officially supported, as I cannot verify nor maintain them
 
 </details>
 
