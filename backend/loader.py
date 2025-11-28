@@ -352,6 +352,9 @@ def replace_state_dict(sd: dict[str, torch.Tensor], asd: dict[str, torch.Tensor]
         gguf_llm_format = {  # city96
             "blk.": "model.layers.",
             "attn_norm": "input_layernorm",
+            "attn_q_norm.": "self_attn.q_norm.",
+            "attn_k_norm.": "self_attn.k_norm.",
+            "attn_v_norm.": "self_attn.v_norm.",
             "attn_q": "self_attn.q_proj",
             "attn_k": "self_attn.k_proj",
             "attn_v": "self_attn.v_proj",
