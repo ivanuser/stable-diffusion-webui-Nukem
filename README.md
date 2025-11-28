@@ -287,10 +287,7 @@ The name "Forge" is inspired by "Minecraft Forge". This project aims to become t
         - `fp16_cuda`
         - `fp8_cuda`
 
-- If you are getting `NaN` errors, try:
-```bash
---sage2-function fp16_cuda --sage-quant-gran per_warp --sage-accum-dtype fp16+fp32
-```
+> If you are getting `NaN` errors, try play around with them
 
 </details>
 
