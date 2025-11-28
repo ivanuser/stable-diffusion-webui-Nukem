@@ -22,7 +22,7 @@ The name "Forge" is inspired by "Minecraft Forge". This project aims to become t
 
 <br>
 
-## Features [Oct. 08]
+## Features [Nov.]
 > Most base features of the original [Automatic1111 Webui](https://github.com/AUTOMATIC1111/stable-diffusion-webui) should still function
 
 #### New Features
@@ -52,7 +52,7 @@ The name "Forge" is inspired by "Minecraft Forge". This project aims to become t
     - enable in **Settings/Optimizations**
 
 > [!Important]
-> - Both `fp16_accumulation` and `cublas_ops` achieve the same speed up; if you already install/update to PyTorch **2.7.0** +, there is little reason to go for `cublas_ops`
+> Both `fp16_accumulation` and `cublas_ops` achieve the same speed up; if you already install/update to PyTorch **2.7.0** +, there is little reason to go for `cublas_ops`
 
 - [X] Support fast `fp8` operation *(`torch._scaled_mm`)*
     - requires RTX **40** +
@@ -61,7 +61,10 @@ The name "Forge" is inspired by "Minecraft Forge". This project aims to become t
     - enable in **Settings/Optimizations**
 
 > [!Note]
-> - The `fp16_accumulation` and `cublas_ops` require `fp16` precision, thus is not compatible with the `fp8` operation
+> The `fp16_accumulation` and `cublas_ops` require `fp16` precision, thus is not compatible with the `fp8` operation
+
+> [!Tip]
+> **[Even Faster Speed](https://github.com/Haoming02/sd-webui-forge-classic/wiki/cuDNN)** 🤯
 
 <br>
 
@@ -167,6 +170,7 @@ The name "Forge" is inspired by "Minecraft Forge". This project aims to become t
 - [X] Improve hash caching
 - [X] Improve error logs
     - no longer print `TypeError: 'NoneType' object is not iterable`
+- [X] Improve implementation for `Comments`
 - [X] Update the implementation for `uni_pc` sampler
 - [X] Revamp settings
     - improve formatting
@@ -199,8 +203,8 @@ The name "Forge" is inspired by "Minecraft Forge". This project aims to become t
 - [X] Update `protobuf`
     - faster `insightface` loading
 - [X] Update to latest PyTorch
-    - `torch==2.8.0+cu128`
-    - `xformers==0.0.32`
+    - `torch==2.9.1+cu130`
+    - `xformers==0.0.33`
 
 > [!Note]
 > If your GPU does not support the latest PyTorch, manually [install](#install-older-pytorch) older version of PyTorch
@@ -519,8 +523,8 @@ In my experience, the speed of each attention function for SDXL is ranked in the
 - **Issues** about removed features will simply be ignored
 - **Issues** regarding installation will be ignored if it's obviously user-error
 - **Feature Request** not related to performance or optimization will simply be ignored
-    - For cutting edge features, check out [reForge](https://github.com/Panchovix/stable-diffusion-webui-reForge) instead
-    - Non-Windows platforms will not be supported, as I cannot verify nor maintain them
+    - For cutting edge features, check out the [Neo](https://github.com/Haoming02/sd-webui-forge-classic/tree/neo) branch instead
+    - Non-Windows platforms will not be officially supported, as I cannot verify nor maintain them
 
 </details>
 
