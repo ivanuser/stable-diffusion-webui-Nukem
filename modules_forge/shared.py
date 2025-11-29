@@ -1,10 +1,7 @@
-import argparse
 import os
 
 from backend import utils
-from modules.paths_internal import models_path, normalized_filepath
-
-parser = argparse.ArgumentParser()
+from modules.paths_internal import models_path, normalized_filepath, parser
 
 parser.add_argument(
     "--controlnet-dir",
