@@ -1,0 +1,26 @@
+/home/ihoner/Projects/repo/github/stable-diffusion-webui-Nukem/venv/lib/python3.12/site-packages/torch/cuda/__init__.py:827: UserWarning: Can't initialize NVML
+  warnings.warn("Can't initialize NVML")
+/home/ihoner/Projects/repo/github/stable-diffusion-webui-Nukem/venv/lib/python3.12/site-packages/torch/cuda/__init__.py:827: UserWarning: Can't initialize NVML
+  warnings.warn("Can't initialize NVML")
+/home/ihoner/Projects/repo/github/stable-diffusion-webui-Nukem/venv/lib/python3.12/site-packages/torch/cuda/__init__.py:827: UserWarning: Can't initialize NVML
+  warnings.warn("Can't initialize NVML")
+/home/ihoner/Projects/repo/github/stable-diffusion-webui-Nukem/venv/lib/python3.12/site-packages/torch/cuda/__init__.py:827: UserWarning: Can't initialize NVML
+  warnings.warn("Can't initialize NVML")
+Python 3.12.3 (main, Nov  6 2025, 13:44:16) [GCC 13.3.0]
+Version: neo
+Installing requirements
+Launching Web UI with arguments: --skip-torch-cuda-test --skip-python-version-check --always-cpu --listen
+Total VRAM 24014 MB, total RAM 24014 MB
+pytorch version: 2.9.1+cu128
+Set vram state to: DISABLED
+Device: cpu
+VAE dtype preferences: [torch.float32] -> torch.float32
+CUDA Using Stream: False
+Warning: caught exception 'No CUDA GPUs are available', memory monitor disabled
+Using Basic Cross Attention
+Using Split Attention for VAE
+ControlNet preprocessor location: /home/ihoner/Projects/repo/github/stable-diffusion-webui-Nukem/models/ControlNetPreprocessor
+[ControlNet] - [0;32mINFO[0m - ControlNet UI callback registered.
+You do not have any model!
+Model selected: {'checkpoint_info': None, 'additional_modules': [], 'unet_storage_dtype': None}
+Using online LoRAs in FP16: False
