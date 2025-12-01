@@ -5,18 +5,16 @@ Gradio-based UI for browsing, searching, and downloading models from CivitAI.
 """
 
 import logging
-import os
 from typing import Optional
 
 import gradio as gr
 
 from modules import shared
-from modules.ui_components import FormRow, ToolButton
+from modules.ui_components import FormRow
 
 from modules_forge.civitai.api_client import (
     CivitAIClient,
     CivitAIError,
-    CivitAINotFoundError,
     get_client,
     init_client,
 )
@@ -29,22 +27,10 @@ from modules_forge.civitai.models import ModelType, CivitAIModel
 
 logger = logging.getLogger(__name__)
 
-# Refresh symbol
-refresh_symbol = "\U0001f504"  # 🔄
-download_symbol = "\u2B07"  # ⬇
-search_symbol = "\U0001f50D"  # 🔍
-info_symbol = "\u2139\ufe0f"  # ℹ️
-link_symbol = "\U0001f517"  # 🔗
-
 
 def get_api_key() -> str:
     """Get API key from settings."""
     return getattr(shared.opts, "civitai_api_key", "") or ""
-
-
-def is_enabled() -> bool:
-    """Check if CivitAI integration is enabled."""
-    return getattr(shared.opts, "civitai_enabled", True)
 
 
 def format_number(num: int) -> str:
@@ -65,142 +51,6 @@ def format_file_size(size_kb: float) -> str:
     return f"{size_kb:.0f} KB"
 
 
-def create_model_card_html(model: CivitAIModel) -> str:
-    """Create HTML for a model card."""
-    # Get preview image
-    preview_url = ""
-    if model.preview_image:
-        preview_url = model.preview_image.url
-
-    # Get stats
-    downloads = format_number(model.stats.download_count if model.stats else 0)
-    rating = f"{model.stats.rating:.1f}" if model.stats and model.stats.rating else "N/A"
-
-    # Get latest version info
-    latest = model.latest_version
-    base_model = latest.base_model if latest else "Unknown"
-
-    # File size
-    file_size = ""
-    if latest and latest.primary_file:
-        file_size = format_file_size(latest.primary_file.size_kb)
-
-    nsfw_badge = '<span class="civitai-nsfw-badge">NSFW</span>' if model.nsfw else ""
-
-    return f"""
-    <div class="civitai-model-card" data-model-id="{model.id}">
-        <div class="civitai-card-image">
-            <img src="{preview_url}" alt="{model.name}" loading="lazy" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect fill=%22%23333%22 width=%22100%22 height=%22100%22/><text fill=%22%23666%22 font-size=%2212%22 x=%2250%22 y=%2250%22 text-anchor=%22middle%22>No Image</text></svg>'"/>
-            {nsfw_badge}
-        </div>
-        <div class="civitai-card-info">
-            <div class="civitai-card-title" title="{model.name}">{model.name}</div>
-            <div class="civitai-card-meta">
-                <span class="civitai-card-type">{model.type}</span>
-                <span class="civitai-card-base">{base_model}</span>
-            </div>
-            <div class="civitai-card-stats">
-                <span title="Downloads">{download_symbol} {downloads}</span>
-                <span title="Rating">★ {rating}</span>
-                {f'<span title="Size">{file_size}</span>' if file_size else ''}
-            </div>
-        </div>
-    </div>
-    """
-
-
-def create_model_detail_html(model: CivitAIModel) -> str:
-    """Create HTML for model detail view."""
-    if not model:
-        return "<div class='civitai-no-selection'>Select a model to view details</div>"
-
-    # Creator info
-    creator = model.creator.username if model.creator else "Unknown"
-
-    # Stats
-    downloads = format_number(model.stats.download_count if model.stats else 0)
-    favorites = format_number(model.stats.favorite_count if model.stats else 0)
-    rating = f"{model.stats.rating:.1f}" if model.stats and model.stats.rating else "N/A"
-
-    # Tags
-    tags_html = " ".join([f'<span class="civitai-tag">{tag}</span>' for tag in model.tags[:10]])
-
-    # Versions list
-    versions_html = ""
-    for v in model.model_versions[:5]:
-        file_size = ""
-        if v.primary_file:
-            file_size = format_file_size(v.primary_file.size_kb)
-        versions_html += f"""
-        <div class="civitai-version-item" data-version-id="{v.id}">
-            <span class="civitai-version-name">{v.name}</span>
-            <span class="civitai-version-base">{v.base_model or 'Unknown'}</span>
-            <span class="civitai-version-size">{file_size}</span>
-        </div>
-        """
-
-    # Description (truncated)
-    description = model.description or "No description available."
-    if len(description) > 500:
-        description = description[:500] + "..."
-
-    # Preview images
-    images_html = ""
-    if model.latest_version:
-        for img in model.latest_version.images[:4]:
-            images_html += f'<img src="{img.url}" alt="Preview" loading="lazy" class="civitai-detail-preview"/>'
-
-    return f"""
-    <div class="civitai-model-detail">
-        <div class="civitai-detail-header">
-            <h2>{model.name}</h2>
-            <a href="https://civitai.com/models/{model.id}" target="_blank" class="civitai-external-link">{link_symbol} View on CivitAI</a>
-        </div>
-
-        <div class="civitai-detail-images">
-            {images_html}
-        </div>
-
-        <div class="civitai-detail-meta">
-            <div class="civitai-detail-row">
-                <span class="civitai-detail-label">Creator:</span>
-                <span>{creator}</span>
-            </div>
-            <div class="civitai-detail-row">
-                <span class="civitai-detail-label">Type:</span>
-                <span>{model.type}</span>
-            </div>
-            <div class="civitai-detail-row">
-                <span class="civitai-detail-label">Downloads:</span>
-                <span>{downloads}</span>
-            </div>
-            <div class="civitai-detail-row">
-                <span class="civitai-detail-label">Favorites:</span>
-                <span>{favorites}</span>
-            </div>
-            <div class="civitai-detail-row">
-                <span class="civitai-detail-label">Rating:</span>
-                <span>★ {rating}</span>
-            </div>
-        </div>
-
-        <div class="civitai-detail-tags">
-            {tags_html}
-        </div>
-
-        <div class="civitai-detail-description">
-            <h3>Description</h3>
-            <p>{description}</p>
-        </div>
-
-        <div class="civitai-detail-versions">
-            <h3>Versions</h3>
-            {versions_html}
-        </div>
-    </div>
-    """
-
-
 class CivitAIBrowser:
     """CivitAI Browser UI component."""
 
@@ -218,22 +68,9 @@ class CivitAIBrowser:
         period: str,
         base_model: str,
         page: int = 1,
-    ) -> tuple[str, str, str]:
-        """
-        Search CivitAI for models.
-
-        Returns:
-            Tuple of (results_html, status_text, page_info)
-        """
-        if not is_enabled():
-            return (
-                "<div class='civitai-disabled'>CivitAI integration is disabled in settings.</div>",
-                "CivitAI disabled",
-                "Page 0 of 0",
-            )
-
+    ):
+        """Search CivitAI for models. Returns gallery data and status."""
         try:
-            # Initialize client with current API key
             api_key = get_api_key()
             client = init_client(api_key) if api_key else get_client()
 
@@ -249,10 +86,8 @@ class CivitAIBrowser:
             if base_model and base_model != "All":
                 base_models = [base_model]
 
-            # Get results per page from settings
             limit = getattr(shared.opts, "civitai_results_per_page", 20)
 
-            # Perform search
             results = client.search_models(
                 query=query if query else None,
                 model_type=type_filter,
@@ -260,68 +95,137 @@ class CivitAIBrowser:
                 period=period,
                 base_models=base_models,
                 limit=limit,
-                page=page,
+                page=int(page),
             )
 
             self.current_results = results.items
             self.current_page = results.current_page
             self.total_pages = results.total_pages
 
-            # Generate HTML for results
             if not results.items:
                 return (
-                    "<div class='civitai-no-results'>No models found matching your search.</div>",
-                    f"No results for '{query}'",
+                    [],  # gallery
+                    "No models found",
                     f"Page {self.current_page} of {self.total_pages}",
+                    gr.update(choices=[]),  # model selector
                 )
 
-            cards_html = '<div class="civitai-results-grid">'
+            # Build gallery images and model choices
+            gallery_items = []
+            model_choices = []
+
             for model in results.items:
-                cards_html += create_model_card_html(model)
-            cards_html += "</div>"
+                # Get preview image
+                preview_url = None
+                if model.preview_image and model.preview_image.url:
+                    preview_url = model.preview_image.url
+
+                # Get info for label
+                downloads = format_number(model.stats.download_count if model.stats else 0)
+                model_label = f"{model.name} ({model.type}, {downloads} DLs)"
+
+                if preview_url:
+                    gallery_items.append((preview_url, model_label))
+
+                model_choices.append(f"{model.id}: {model.name}")
 
             return (
-                cards_html,
+                gallery_items,
                 f"Found {results.total_items} models",
                 f"Page {self.current_page} of {self.total_pages}",
+                gr.update(choices=model_choices, value=model_choices[0] if model_choices else None),
             )
 
         except CivitAIError as e:
             logger.error(f"CivitAI search error: {e}")
-            return (
-                f"<div class='civitai-error'>Error: {e}</div>",
-                f"Error: {e}",
-                "Page 0 of 0",
-            )
+            return [], f"Error: {e}", "Page 0 of 0", gr.update(choices=[])
         except Exception as e:
             logger.error(f"Unexpected error during search: {e}")
+            return [], f"Error: {e}", "Page 0 of 0", gr.update(choices=[])
+
+    def load_model_details(self, model_selection: str):
+        """Load details for selected model."""
+        if not model_selection:
+            return "Select a model to view details", gr.update(choices=[]), "", ""
+
+        try:
+            # Parse model ID from selection
+            model_id = int(model_selection.split(":")[0])
+
+            # Find in current results or fetch
+            model = None
+            for m in self.current_results:
+                if m.id == model_id:
+                    model = m
+                    break
+
+            if not model:
+                api_key = get_api_key()
+                client = init_client(api_key) if api_key else get_client()
+                model = client.get_model(model_id)
+
+            self.selected_model = model
+
+            # Build details text
+            creator = model.creator.username if model.creator else "Unknown"
+            downloads = format_number(model.stats.download_count if model.stats else 0)
+            rating = f"{model.stats.rating:.1f}" if model.stats and model.stats.rating else "N/A"
+
+            details = f"""**{model.name}**
+
+**Creator:** {creator}
+**Type:** {model.type}
+**Downloads:** {downloads}
+**Rating:** ★ {rating}
+
+**Tags:** {', '.join(model.tags[:10]) if model.tags else 'None'}
+
+**Description:**
+{(model.description or 'No description')[:500]}{'...' if model.description and len(model.description) > 500 else ''}
+
+[View on CivitAI](https://civitai.com/models/{model.id})
+"""
+
+            # Build version choices
+            version_choices = []
+            for v in model.model_versions[:10]:
+                size = ""
+                if v.primary_file:
+                    size = f" ({format_file_size(v.primary_file.size_kb)})"
+                version_choices.append(f"{v.id}: {v.name}{size}")
+
+            # Get first version ID for auto-fill
+            first_version_id = str(model.model_versions[0].id) if model.model_versions else ""
+
             return (
-                f"<div class='civitai-error'>Unexpected error: {e}</div>",
-                f"Error: {e}",
-                "Page 0 of 0",
+                details,
+                gr.update(choices=version_choices, value=version_choices[0] if version_choices else None),
+                first_version_id,
+                model.type,
             )
 
-    def select_model(self, model_id: int) -> str:
-        """Select a model and return its detail HTML."""
-        for model in self.current_results:
-            if model.id == model_id:
-                self.selected_model = model
-                return create_model_detail_html(model)
-
-        # If not in current results, fetch from API
-        try:
-            api_key = get_api_key()
-            client = init_client(api_key) if api_key else get_client()
-            model = client.get_model(model_id)
-            self.selected_model = model
-            return create_model_detail_html(model)
         except Exception as e:
-            return f"<div class='civitai-error'>Error loading model: {e}</div>"
+            logger.error(f"Error loading model details: {e}")
+            return f"Error: {e}", gr.update(choices=[]), "", ""
 
-    def download_model(self, version_id: int, model_type: str) -> str:
+    def get_version_id(self, version_selection: str):
+        """Extract version ID from selection."""
+        if not version_selection:
+            return ""
+        try:
+            return version_selection.split(":")[0]
+        except:
+            return ""
+
+    def download_model(self, version_id_str: str, model_type: str) -> str:
         """Queue a model download."""
-        if not version_id:
+        if not version_id_str:
             return "No version selected"
+
+        try:
+            version_id = int(version_id_str)
+        except:
+            return "Invalid version ID"
 
         api_key = get_api_key()
         if not api_key:
@@ -333,7 +237,7 @@ class CivitAIBrowser:
                 version_id=version_id,
                 model_type=model_type,
             )
-            return f"Download queued: {task.file_name}"
+            return f"Download started: {task.file_name}\nSaving to: {task.destination_path}"
         except Exception as e:
             return f"Download error: {e}"
 
@@ -343,23 +247,25 @@ class CivitAIBrowser:
         tasks = downloader.get_all_tasks()
 
         if not tasks:
-            return "No active downloads"
+            return "No downloads"
 
         status_lines = []
-        for task in tasks[-5:]:  # Show last 5
+        for task in tasks[-5:]:
             if task.status == DownloadStatus.DOWNLOADING:
                 status_lines.append(
-                    f"{task.file_name}: {task.progress.percent:.0f}% "
-                    f"({task.progress.format_speed()}, ETA: {task.progress.format_eta()})"
+                    f"⬇ {task.file_name}: {task.progress.percent:.0f}% "
+                    f"({task.progress.format_speed()})"
                 )
             elif task.status == DownloadStatus.COMPLETED:
-                status_lines.append(f"{task.file_name}: Complete ✓")
+                status_lines.append(f"✓ {task.file_name}: Complete")
             elif task.status == DownloadStatus.FAILED:
-                status_lines.append(f"{task.file_name}: Failed - {task.error}")
+                status_lines.append(f"✗ {task.file_name}: Failed - {task.error}")
+            elif task.status == DownloadStatus.VERIFYING:
+                status_lines.append(f"🔍 {task.file_name}: Verifying...")
             else:
-                status_lines.append(f"{task.file_name}: {task.status.value}")
+                status_lines.append(f"⏳ {task.file_name}: {task.status.value}")
 
-        return "\n".join(status_lines)
+        return "\n".join(status_lines) if status_lines else "No downloads"
 
     def sync_local_models(self, progress=gr.Progress()) -> str:
         """Sync local models with CivitAI metadata."""
@@ -380,7 +286,7 @@ class CivitAIBrowser:
             not_found = sum(1 for r in results if not r.found_on_civitai and r.success)
             errors = sum(1 for r in results if not r.success)
 
-            return f"Sync complete: {found} matched, {not_found} not on CivitAI, {errors} errors"
+            return f"Sync complete!\n✓ {found} matched on CivitAI\n○ {not_found} not found\n✗ {errors} errors"
         except Exception as e:
             return f"Sync error: {e}"
 
@@ -388,11 +294,17 @@ class CivitAIBrowser:
         """Test if the API key is valid."""
         api_key = get_api_key()
         if not api_key:
-            return "No API key configured"
+            return "⚠ No API key configured.\nSet it in Settings > CivitAI"
 
-        client = CivitAIClient(api_key=api_key)
-        result = client.test_api_key()
-        return result["message"]
+        try:
+            client = CivitAIClient(api_key=api_key)
+            result = client.test_api_key()
+            if result["valid"]:
+                return "✓ API key is valid!"
+            else:
+                return f"✗ {result['message']}"
+        except Exception as e:
+            return f"✗ Error: {e}"
 
 
 # Global browser instance
@@ -412,356 +324,177 @@ def create_ui():
     browser = get_browser()
 
     with gr.Blocks(analytics_enabled=False) as civitai_interface:
-        # CSS styles
-        gr.HTML("""
-        <style>
-        .civitai-results-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-            gap: 16px;
-            padding: 16px;
-        }
-        .civitai-model-card {
-            background: var(--block-background-fill);
-            border: 1px solid var(--border-color-primary);
-            border-radius: 8px;
-            overflow: hidden;
-            cursor: pointer;
-            transition: transform 0.2s, box-shadow 0.2s;
-        }
-        .civitai-model-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-        }
-        .civitai-card-image {
-            position: relative;
-            aspect-ratio: 1;
-            background: var(--background-fill-secondary);
-        }
-        .civitai-card-image img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-        .civitai-nsfw-badge {
-            position: absolute;
-            top: 4px;
-            right: 4px;
-            background: #e53935;
-            color: white;
-            padding: 2px 6px;
-            border-radius: 4px;
-            font-size: 10px;
-            font-weight: bold;
-        }
-        .civitai-card-info {
-            padding: 8px;
-        }
-        .civitai-card-title {
-            font-weight: 600;
-            font-size: 14px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            margin-bottom: 4px;
-        }
-        .civitai-card-meta {
-            display: flex;
-            gap: 8px;
-            font-size: 11px;
-            color: var(--body-text-color-subdued);
-            margin-bottom: 4px;
-        }
-        .civitai-card-type {
-            background: var(--primary-500);
-            color: white;
-            padding: 1px 4px;
-            border-radius: 3px;
-        }
-        .civitai-card-stats {
-            display: flex;
-            gap: 8px;
-            font-size: 11px;
-            color: var(--body-text-color-subdued);
-        }
-        .civitai-model-detail {
-            padding: 16px;
-        }
-        .civitai-detail-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 16px;
-        }
-        .civitai-detail-header h2 {
-            margin: 0;
-            font-size: 20px;
-        }
-        .civitai-external-link {
-            color: var(--link-text-color);
-            text-decoration: none;
-        }
-        .civitai-detail-images {
-            display: flex;
-            gap: 8px;
-            margin-bottom: 16px;
-            overflow-x: auto;
-        }
-        .civitai-detail-preview {
-            height: 150px;
-            border-radius: 4px;
-        }
-        .civitai-detail-meta {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 8px;
-            margin-bottom: 16px;
-        }
-        .civitai-detail-row {
-            display: flex;
-            gap: 8px;
-        }
-        .civitai-detail-label {
-            font-weight: 600;
-            color: var(--body-text-color-subdued);
-        }
-        .civitai-detail-tags {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 4px;
-            margin-bottom: 16px;
-        }
-        .civitai-tag {
-            background: var(--background-fill-secondary);
-            padding: 2px 8px;
-            border-radius: 12px;
-            font-size: 12px;
-        }
-        .civitai-version-item {
-            display: flex;
-            justify-content: space-between;
-            padding: 8px;
-            border: 1px solid var(--border-color-primary);
-            border-radius: 4px;
-            margin-bottom: 4px;
-            cursor: pointer;
-        }
-        .civitai-version-item:hover {
-            background: var(--background-fill-secondary);
-        }
-        .civitai-no-results, .civitai-error, .civitai-disabled, .civitai-no-selection {
-            padding: 40px;
-            text-align: center;
-            color: var(--body-text-color-subdued);
-        }
-        .civitai-error {
-            color: #e53935;
-        }
-        </style>
-        """)
+        gr.Markdown("# CivitAI Model Browser")
+        gr.Markdown("Search and download models directly from CivitAI")
 
         with gr.Row():
-            # Left panel - Search and Results
+            # Left column - Search
             with gr.Column(scale=2):
-                gr.Markdown("## CivitAI Model Browser")
+                with gr.Group():
+                    gr.Markdown("### Search")
+                    with FormRow():
+                        search_query = gr.Textbox(
+                            label="Search",
+                            placeholder="Enter model name or keywords...",
+                            scale=3,
+                        )
+                        search_btn = gr.Button("🔍 Search", scale=1, variant="primary")
 
-                # Search controls
-                with FormRow():
-                    search_query = gr.Textbox(
-                        label="Search",
-                        placeholder="Search models...",
-                        scale=3,
-                    )
-                    search_btn = ToolButton(
-                        value=search_symbol,
-                        elem_id="civitai_search_btn",
-                    )
+                    with gr.Row():
+                        model_type = gr.Dropdown(
+                            label="Type",
+                            choices=["All", "Checkpoint", "LORA", "LoCon", "VAE",
+                                    "Controlnet", "Upscaler", "TextualInversion"],
+                            value="All",
+                        )
+                        sort_order = gr.Dropdown(
+                            label="Sort",
+                            choices=["Most Downloaded", "Highest Rated", "Newest"],
+                            value="Most Downloaded",
+                        )
+                        time_period = gr.Dropdown(
+                            label="Period",
+                            choices=["AllTime", "Year", "Month", "Week", "Day"],
+                            value="AllTime",
+                        )
+                        base_model_filter = gr.Dropdown(
+                            label="Base Model",
+                            choices=["All", "SDXL 1.0", "SD 1.5", "Flux.1 D", "Pony", "Illustrious"],
+                            value="All",
+                        )
 
-                with FormRow():
-                    model_type = gr.Dropdown(
-                        label="Type",
-                        choices=["All", "Checkpoint", "LORA", "LoCon", "VAE",
-                                "Controlnet", "Upscaler", "TextualInversion", "MotionModule"],
-                        value="All",
-                        scale=1,
-                    )
-                    sort_order = gr.Dropdown(
-                        label="Sort",
-                        choices=["Most Downloaded", "Highest Rated", "Most Liked",
-                                "Most Discussed", "Most Collected", "Newest"],
-                        value="Most Downloaded",
-                        scale=1,
-                    )
-                    time_period = gr.Dropdown(
-                        label="Period",
-                        choices=["AllTime", "Year", "Month", "Week", "Day"],
-                        value="AllTime",
-                        scale=1,
-                    )
-                    base_model_filter = gr.Dropdown(
-                        label="Base Model",
-                        choices=["All", "SDXL 1.0", "SD 1.5", "Flux.1 D", "Flux.1 S",
-                                "Pony", "SD 3.5", "Wan", "Illustrious"],
-                        value="All",
-                        scale=1,
-                    )
+                with gr.Group():
+                    gr.Markdown("### Results")
+                    with gr.Row():
+                        status_text = gr.Textbox(label="Status", value="Ready", interactive=False, scale=2)
+                        page_info = gr.Textbox(label="Page", value="Page 0 of 0", interactive=False, scale=1)
 
-                # Status bar
-                with FormRow():
-                    status_text = gr.Textbox(
-                        label="Status",
-                        value="Ready to search",
-                        interactive=False,
-                        scale=2,
-                    )
-                    page_info = gr.Textbox(
-                        label="Page",
-                        value="Page 0 of 0",
-                        interactive=False,
-                        scale=1,
+                    results_gallery = gr.Gallery(
+                        label="Models",
+                        columns=4,
+                        height=400,
+                        object_fit="cover",
+                        show_label=False,
                     )
 
-                # Results display
-                results_html = gr.HTML(
-                    value="<div class='civitai-no-results'>Enter a search term or browse by type</div>",
-                    elem_id="civitai_results",
-                )
+                    model_selector = gr.Dropdown(
+                        label="Select a model to view details",
+                        choices=[],
+                        interactive=True,
+                    )
 
-                # Pagination
-                with FormRow():
-                    prev_btn = gr.Button("← Previous", scale=1)
-                    current_page = gr.Number(value=1, label="Page", minimum=1, scale=1)
-                    next_btn = gr.Button("Next →", scale=1)
+                    with gr.Row():
+                        prev_btn = gr.Button("← Previous")
+                        current_page = gr.Number(value=1, label="Page", minimum=1, precision=0)
+                        next_btn = gr.Button("Next →")
 
-            # Right panel - Model Details & Downloads
+            # Right column - Details & Download
             with gr.Column(scale=1):
-                gr.Markdown("## Model Details")
+                with gr.Group():
+                    gr.Markdown("### Model Details")
+                    model_details = gr.Markdown(value="*Select a model to view details*")
 
-                # Model ID input (for manual lookup)
-                with FormRow():
-                    model_id_input = gr.Number(
-                        label="Model ID",
-                        value=0,
-                        precision=0,
-                    )
-                    load_model_btn = ToolButton(
-                        value=info_symbol,
-                        elem_id="civitai_load_model_btn",
+                    version_selector = gr.Dropdown(
+                        label="Select Version",
+                        choices=[],
+                        interactive=True,
                     )
 
-                # Detail display
-                detail_html = gr.HTML(
-                    value="<div class='civitai-no-selection'>Select a model to view details</div>",
-                    elem_id="civitai_detail",
-                )
+                with gr.Group():
+                    gr.Markdown("### Download")
+                    with gr.Row():
+                        version_id_input = gr.Textbox(label="Version ID", interactive=True)
+                        download_type = gr.Dropdown(
+                            label="Save as Type",
+                            choices=["Checkpoint", "LORA", "VAE", "Controlnet", "Upscaler", "TextualInversion"],
+                            value="Checkpoint",
+                        )
 
-                # Download section
-                gr.Markdown("### Download")
-                with FormRow():
-                    version_id_input = gr.Number(
-                        label="Version ID",
-                        value=0,
-                        precision=0,
-                    )
-                    download_type = gr.Dropdown(
-                        label="Save as",
-                        choices=["Checkpoint", "LORA", "VAE", "Controlnet",
-                                "Upscaler", "TextualInversion"],
-                        value="Checkpoint",
-                    )
+                    download_btn = gr.Button("⬇ Download Model", variant="primary")
+                    download_status = gr.Textbox(label="Download Status", value="No downloads", lines=3, interactive=False)
+                    refresh_status_btn = gr.Button("🔄 Refresh Status")
 
-                download_btn = gr.Button(f"{download_symbol} Download Model", variant="primary")
-                download_status = gr.Textbox(
-                    label="Download Status",
-                    value="No active downloads",
-                    interactive=False,
-                    lines=3,
-                )
-                refresh_downloads_btn = gr.Button(f"{refresh_symbol} Refresh Status")
+                with gr.Group():
+                    gr.Markdown("### Tools")
+                    test_api_btn = gr.Button("Test API Key")
+                    api_status = gr.Textbox(label="API Status", interactive=False)
 
-                # Sync section
-                gr.Markdown("### Local Model Sync")
-                sync_btn = gr.Button(f"{refresh_symbol} Sync Local Models with CivitAI")
-                sync_status = gr.Textbox(
-                    label="Sync Status",
-                    value="",
-                    interactive=False,
-                )
-
-                # API Test
-                gr.Markdown("### API Status")
-                test_api_btn = gr.Button("Test API Key")
-                api_status = gr.Textbox(
-                    label="API Status",
-                    value="",
-                    interactive=False,
-                )
+                    sync_btn = gr.Button("🔄 Sync Local Models")
+                    sync_status = gr.Textbox(label="Sync Status", interactive=False, lines=3)
 
         # Event handlers
         def do_search(query, mtype, sort, period, base, page):
-            return browser.search(query, mtype, sort, period, base, int(page))
+            return browser.search(query, mtype, sort, period, base, page)
 
         search_btn.click(
             fn=do_search,
-            inputs=[search_query, model_type, sort_order, time_period,
-                   base_model_filter, current_page],
-            outputs=[results_html, status_text, page_info],
+            inputs=[search_query, model_type, sort_order, time_period, base_model_filter, current_page],
+            outputs=[results_gallery, status_text, page_info, model_selector],
         )
 
         search_query.submit(
             fn=do_search,
-            inputs=[search_query, model_type, sort_order, time_period,
-                   base_model_filter, current_page],
-            outputs=[results_html, status_text, page_info],
+            inputs=[search_query, model_type, sort_order, time_period, base_model_filter, current_page],
+            outputs=[results_gallery, status_text, page_info, model_selector],
         )
 
         def go_prev(query, mtype, sort, period, base, page):
             new_page = max(1, int(page) - 1)
-            return (new_page,) + browser.search(query, mtype, sort, period, base, new_page)
+            result = browser.search(query, mtype, sort, period, base, new_page)
+            return (new_page,) + result
 
         def go_next(query, mtype, sort, period, base, page):
             new_page = int(page) + 1
-            return (new_page,) + browser.search(query, mtype, sort, period, base, new_page)
+            result = browser.search(query, mtype, sort, period, base, new_page)
+            return (new_page,) + result
 
         prev_btn.click(
             fn=go_prev,
-            inputs=[search_query, model_type, sort_order, time_period,
-                   base_model_filter, current_page],
-            outputs=[current_page, results_html, status_text, page_info],
+            inputs=[search_query, model_type, sort_order, time_period, base_model_filter, current_page],
+            outputs=[current_page, results_gallery, status_text, page_info, model_selector],
         )
 
         next_btn.click(
             fn=go_next,
-            inputs=[search_query, model_type, sort_order, time_period,
-                   base_model_filter, current_page],
-            outputs=[current_page, results_html, status_text, page_info],
+            inputs=[search_query, model_type, sort_order, time_period, base_model_filter, current_page],
+            outputs=[current_page, results_gallery, status_text, page_info, model_selector],
         )
 
-        load_model_btn.click(
-            fn=lambda mid: browser.select_model(int(mid)),
-            inputs=[model_id_input],
-            outputs=[detail_html],
+        # Model selection
+        model_selector.change(
+            fn=browser.load_model_details,
+            inputs=[model_selector],
+            outputs=[model_details, version_selector, version_id_input, download_type],
         )
 
+        # Version selection updates version ID
+        version_selector.change(
+            fn=browser.get_version_id,
+            inputs=[version_selector],
+            outputs=[version_id_input],
+        )
+
+        # Download
         download_btn.click(
-            fn=lambda vid, dtype: browser.download_model(int(vid), dtype),
+            fn=browser.download_model,
             inputs=[version_id_input, download_type],
             outputs=[download_status],
         )
 
-        refresh_downloads_btn.click(
+        refresh_status_btn.click(
             fn=browser.get_download_status,
             outputs=[download_status],
+        )
+
+        # Tools
+        test_api_btn.click(
+            fn=browser.test_api_key,
+            outputs=[api_status],
         )
 
         sync_btn.click(
             fn=browser.sync_local_models,
             outputs=[sync_status],
-        )
-
-        test_api_btn.click(
-            fn=browser.test_api_key,
-            outputs=[api_status],
         )
 
     return civitai_interface
