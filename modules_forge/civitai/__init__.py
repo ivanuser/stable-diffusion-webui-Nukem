@@ -49,6 +49,9 @@ from modules_forge.civitai.downloader import (
     get_downloader,
 )
 
+# UI imports are deferred to avoid circular imports during early startup
+# Use: from modules_forge.civitai.ui import create_ui, on_ui_tabs
+
 __all__ = [
     # Client
     "CivitAIClient",

@@ -105,4 +105,11 @@ def initialize_forge(startup_timer):
     from backend.huggingface import process
     process()
 
+    # Initialize CivitAI integration
+    try:
+        from modules_forge.civitai import startup as civitai_startup
+        civitai_startup.initialize_civitai()
+    except Exception as e:
+        print(f"Warning: CivitAI integration failed to initialize: {e}")
+
     startup_timer.record("forge init")
