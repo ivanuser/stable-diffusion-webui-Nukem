@@ -599,3 +599,7 @@ options_templates.update(
 
 forge_shared_options.register(options_templates, options_section, OptionInfo)
 forge_presets.register(options_templates, options_section, OptionInfo)
+
+# Register CivitAI settings
+from modules_forge.civitai import settings as civitai_settings
+civitai_settings.register_settings(options_templates)
