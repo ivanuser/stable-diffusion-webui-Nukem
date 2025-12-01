@@ -600,15 +600,6 @@ options_templates.update(
 forge_shared_options.register(options_templates, options_section, OptionInfo)
 forge_presets.register(options_templates, options_section, OptionInfo)
 
-# Register CivitAI settings and UI tab
+# Register CivitAI settings
 from modules_forge.civitai import settings as civitai_settings
 civitai_settings.register_settings(options_templates)
-
-# Register CivitAI browser tab
-try:
-    from modules import script_callbacks
-    from modules_forge.civitai.ui import on_ui_tabs
-    script_callbacks.on_ui_tabs(on_ui_tabs, name="CivitAI")
-    print("CivitAI: Browser tab registered")
-except Exception as e:
-    print(f"CivitAI: Failed to register browser tab: {e}")

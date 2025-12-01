@@ -868,6 +868,15 @@ def create_ui():
         (modelmerger_ui.blocks, "Checkpoint Merger", "modelmerger"),
     ]
 
+    # Add CivitAI browser tab
+    try:
+        from modules_forge.civitai.ui import create_ui as create_civitai_ui
+        civitai_interface = create_civitai_ui()
+        interfaces += [(civitai_interface, "CivitAI", "civitai")]
+        print("CivitAI: Browser tab added")
+    except Exception as e:
+        print(f"CivitAI: Failed to create browser tab: {e}")
+
     interfaces += script_callbacks.ui_tabs_callback()
     interfaces += [(settings.interface, "Settings", "settings")]
 
