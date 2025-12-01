@@ -769,7 +769,13 @@ def create_ui():
 
 def on_ui_tabs():
     """Register the CivitAI tab with the WebUI."""
-    if not is_enabled():
+    try:
+        print("CivitAI: Creating UI tab...")
+        ui = create_ui()
+        print("CivitAI: UI tab created successfully")
+        return [(ui, "CivitAI", "civitai")]
+    except Exception as e:
+        print(f"CivitAI: ERROR creating UI tab: {e}")
+        import traceback
+        traceback.print_exc()
         return []
-
-    return [(create_ui(), "CivitAI", "civitai")]
