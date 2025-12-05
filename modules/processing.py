@@ -868,6 +868,12 @@ def process_images_inner(p: StableDiffusionProcessing) -> Processed:
         if motion_module_name and motion_module_name != "None":
             shared.sd_model.load_motion_module(motion_module_name)
 
+            # Load motion LoRA if specified (requires motion module)
+            motion_lora_name = dynamic_args.get("motion_lora")
+            motion_lora_strength = dynamic_args.get("motion_lora_strength", 1.0)
+            if motion_lora_name and motion_lora_name != "None":
+                shared.sd_model.load_motion_lora(motion_lora_name, motion_lora_strength)
+
         if _is_video:
             p.do_not_save_grid = True
             # Inject motion modules before processing

@@ -77,6 +77,9 @@ class AnimateDiff(ForgeDiffusionEngine):
         self.motion_module: Optional[AnimateDiffModel] = None
         self.motion_module_name: Optional[str] = None
 
+        # Motion LoRA loader
+        self.motion_lora_loader = None
+
         # Store original forward for restoration
         self._original_unet_forward = None
 
@@ -126,12 +129,64 @@ class AnimateDiff(ForgeDiffusionEngine):
 
     def unload_motion_module(self):
         """Unload the current motion module."""
+        # Unload motion LoRAs first
+        if self.motion_lora_loader is not None:
+            self.motion_lora_loader.unload_all()
+            self.motion_lora_loader = None
+
         if self.motion_module is not None:
             del self.motion_module
             self.motion_module = None
             self.motion_module_name = None
             torch.cuda.empty_cache()
             print("[AnimateDiff] Unloaded motion module")
+
+    def load_motion_lora(self, name: str, strength: float = 1.0) -> bool:
+        """Load a motion LoRA to modify motion characteristics.
+
+        Args:
+            name: Name of the motion LoRA file in models/motion_lora/
+            strength: LoRA strength multiplier (0.0 to 1.0+)
+
+        Returns:
+            True if loaded successfully, False otherwise
+        """
+        if self.motion_module is None:
+            print("[AnimateDiff] Cannot load motion LoRA without motion module")
+            return False
+
+        from backend.patcher.motion_lora import MotionLoraLoader, get_motion_lora_path
+
+        # Initialize loader if needed
+        if self.motion_lora_loader is None:
+            self.motion_lora_loader = MotionLoraLoader(self.motion_module)
+
+        path = get_motion_lora_path(name)
+        if path is None:
+            print(f"[AnimateDiff] Motion LoRA not found: {name}")
+            return False
+
+        return self.motion_lora_loader.load_lora(path, strength)
+
+    def unload_motion_lora(self, name: str = None):
+        """Unload motion LoRA(s).
+
+        Args:
+            name: Specific LoRA to unload, or None to unload all
+        """
+        if self.motion_lora_loader is None:
+            return
+
+        if name is None:
+            self.motion_lora_loader.unload_all()
+        else:
+            self.motion_lora_loader.unload_lora(name)
+
+    def get_loaded_motion_loras(self) -> list[str]:
+        """Get list of currently loaded motion LoRAs."""
+        if self.motion_lora_loader is None:
+            return []
+        return list(self.motion_lora_loader.loaded_loras.keys())
 
     def inject_motion_modules(self):
         """Inject motion modules into the UNet for temporal attention.

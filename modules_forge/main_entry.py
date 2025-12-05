@@ -16,6 +16,8 @@ ui_checkpoint: gr.Dropdown = None
 ui_vae: gr.Dropdown = None
 ui_clip_skip: gr.Slider = None
 ui_motion_module: gr.Dropdown = None
+ui_motion_lora: gr.Dropdown = None
+ui_motion_lora_strength: gr.Slider = None
 
 ui_forge_unet_storage_dtype_options: gr.Radio = None
 ui_forge_async_loading: gr.Radio = None
@@ -79,8 +81,35 @@ def on_motion_module_change(module_name):
         print(f"[AnimateDiff] Motion module selected: {module_name}")
 
 
+def get_motion_lora_list():
+    """Get list of available motion LoRAs from models/motion_lora directory."""
+    motion_lora_dir = os.path.join(paths.models_path, "motion_lora")
+
+    if not os.path.exists(motion_lora_dir):
+        os.makedirs(motion_lora_dir, exist_ok=True)
+        return ["None"]
+
+    loras = ["None"]
+    for f in os.listdir(motion_lora_dir):
+        if f.endswith((".safetensors", ".pth", ".ckpt", ".pt")):
+            loras.append(f)
+
+    return sorted(loras)
+
+
+def on_motion_lora_change(lora_name, strength):
+    """Handle motion LoRA selection change."""
+    if lora_name == "None" or not lora_name:
+        dynamic_args["motion_lora"] = None
+        dynamic_args["motion_lora_strength"] = 1.0
+    else:
+        dynamic_args["motion_lora"] = lora_name
+        dynamic_args["motion_lora_strength"] = strength
+        print(f"[AnimateDiff] Motion LoRA selected: {lora_name} at strength {strength}")
+
+
 def make_checkpoint_manager_ui():
-    global ui_checkpoint, ui_vae, ui_clip_skip, ui_forge_unet_storage_dtype_options, ui_forge_async_loading, ui_forge_pin_shared_memory, ui_forge_inference_memory, ui_forge_preset, ui_motion_module
+    global ui_checkpoint, ui_vae, ui_clip_skip, ui_forge_unet_storage_dtype_options, ui_forge_async_loading, ui_forge_pin_shared_memory, ui_forge_inference_memory, ui_forge_preset, ui_motion_module, ui_motion_lora, ui_motion_lora_strength
 
     if shared.opts.sd_model_checkpoint in [None, "None", "none", ""]:
         if len(sd_models.checkpoints_list) == 0:
@@ -133,6 +162,36 @@ def make_checkpoint_manager_ui():
         elem_id="animatediff_motion_module",
     )
     ui_motion_module.change(on_motion_module_change, inputs=[ui_motion_module], queue=False, show_progress=False)
+
+    # AnimateDiff motion LoRA selector (hidden by default, shown when animatediff preset is selected)
+    ui_motion_lora = gr.Dropdown(
+        label="Motion LoRA",
+        value="None",
+        choices=get_motion_lora_list(),
+        visible=False,
+        elem_id="animatediff_motion_lora",
+    )
+    ui_motion_lora_strength = gr.Slider(
+        label="Motion LoRA Strength",
+        value=1.0,
+        minimum=0.0,
+        maximum=2.0,
+        step=0.05,
+        visible=False,
+        elem_id="animatediff_motion_lora_strength",
+    )
+    ui_motion_lora.change(
+        on_motion_lora_change,
+        inputs=[ui_motion_lora, ui_motion_lora_strength],
+        queue=False,
+        show_progress=False,
+    )
+    ui_motion_lora_strength.change(
+        on_motion_lora_change,
+        inputs=[ui_motion_lora, ui_motion_lora_strength],
+        queue=False,
+        show_progress=False,
+    )
 
     ui_checkpoint.change(checkpoint_change, inputs=[ui_checkpoint, ui_forge_preset], show_progress=False)
     ui_vae.change(modules_change, inputs=[ui_vae, ui_forge_preset], queue=False, show_progress=False)
@@ -307,6 +366,8 @@ def forge_main_entry():
         ui_vae,
         ui_clip_skip,
         ui_motion_module,
+        ui_motion_lora,
+        ui_motion_lora_strength,
         ui_forge_unet_storage_dtype_options,
         ui_forge_async_loading,
         ui_forge_pin_shared_memory,
@@ -363,15 +424,18 @@ def on_preset_change(preset: str):
 
     additional_modules = [os.path.basename(x) for x in getattr(shared.opts, f"forge_additional_modules_{preset}", [])]
 
-    # Motion module visibility for AnimateDiff
+    # Motion module and LoRA visibility for AnimateDiff
     show_motion_module = preset == "animatediff"
     motion_module_choices = get_motion_module_list() if show_motion_module else ["None"]
+    motion_lora_choices = get_motion_lora_list() if show_motion_module else ["None"]
 
     return [
         gr.update(value=getattr(shared.opts, f"forge_checkpoint_{preset}", shared.opts.sd_model_checkpoint)),  # ui_checkpoint
         gr.update(value=additional_modules),  # ui_vae
         gr.update(visible=show_clip_skip, value=getattr(shared.opts, "CLIP_stop_at_last_layers", 2)),  # ui_clip_skip
         gr.update(visible=show_motion_module, choices=motion_module_choices, value="None"),  # ui_motion_module
+        gr.update(visible=show_motion_module, choices=motion_lora_choices, value="None"),  # ui_motion_lora
+        gr.update(visible=show_motion_module, value=1.0),  # ui_motion_lora_strength
         gr.update(visible=show_basic_mem, value=getattr(shared.opts, "forge_unet_storage_dtype", "Automatic")),  # ui_forge_unet_storage_dtype_options
         gr.update(visible=show_adv_mem, value=getattr(shared.opts, "forge_async_loading", "Queue")),  # ui_forge_async_loading
         gr.update(visible=show_adv_mem, value=getattr(shared.opts, "forge_pin_shared_memory", "CPU")),  # ui_forge_pin_shared_memory
