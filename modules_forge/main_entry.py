@@ -15,6 +15,7 @@ ui_forge_preset: gr.Radio = None
 ui_checkpoint: gr.Dropdown = None
 ui_vae: gr.Dropdown = None
 ui_clip_skip: gr.Slider = None
+ui_motion_module: gr.Dropdown = None
 
 ui_forge_unet_storage_dtype_options: gr.Radio = None
 ui_forge_async_loading: gr.Radio = None
@@ -53,8 +54,33 @@ def bind_to_opts(comp, k, save=False, callback=None):
     comp.change(on_change, inputs=[comp], queue=False, show_progress=False)
 
 
+def get_motion_module_list():
+    """Get list of available motion modules from models/motion_modules directory."""
+    motion_modules_dir = os.path.join(paths.models_path, "motion_modules")
+
+    if not os.path.exists(motion_modules_dir):
+        os.makedirs(motion_modules_dir, exist_ok=True)
+        return ["None"]
+
+    modules = ["None"]
+    for f in os.listdir(motion_modules_dir):
+        if f.endswith((".safetensors", ".pth", ".ckpt")):
+            modules.append(f)
+
+    return sorted(modules)
+
+
+def on_motion_module_change(module_name):
+    """Handle motion module selection change."""
+    if module_name == "None" or not module_name:
+        dynamic_args["motion_module"] = None
+    else:
+        dynamic_args["motion_module"] = module_name
+        print(f"[AnimateDiff] Motion module selected: {module_name}")
+
+
 def make_checkpoint_manager_ui():
-    global ui_checkpoint, ui_vae, ui_clip_skip, ui_forge_unet_storage_dtype_options, ui_forge_async_loading, ui_forge_pin_shared_memory, ui_forge_inference_memory, ui_forge_preset
+    global ui_checkpoint, ui_vae, ui_clip_skip, ui_forge_unet_storage_dtype_options, ui_forge_async_loading, ui_forge_pin_shared_memory, ui_forge_inference_memory, ui_forge_preset, ui_motion_module
 
     if shared.opts.sd_model_checkpoint in [None, "None", "none", ""]:
         if len(sd_models.checkpoints_list) == 0:
@@ -62,7 +88,7 @@ def make_checkpoint_manager_ui():
         if len(sd_models.checkpoints_list) > 0:
             shared.opts.set("sd_model_checkpoint", next(iter(sd_models.checkpoints_list.values())).name)
 
-    ui_forge_preset = gr.Radio(label="UI Preset", value=lambda: shared.opts.forge_preset, choices=("sd", "xl", "flux", "qwen", "lumina", "wan"), elem_id="forge_ui_preset")
+    ui_forge_preset = gr.Radio(label="UI Preset", value=lambda: shared.opts.forge_preset, choices=("sd", "xl", "flux", "qwen", "lumina", "wan", "animatediff"), elem_id="forge_ui_preset")
 
     ui_checkpoint = gr.Dropdown(label="Checkpoint", value=None, choices=None, elem_classes=["model_selection"])
 
@@ -97,6 +123,16 @@ def make_checkpoint_manager_ui():
 
     ui_clip_skip = gr.Slider(label="Clip Skip", value=lambda: shared.opts.CLIP_stop_at_last_layers, minimum=1, maximum=12, step=1)
     bind_to_opts(ui_clip_skip, "CLIP_stop_at_last_layers", save=True)
+
+    # AnimateDiff motion module selector (hidden by default, shown when animatediff preset is selected)
+    ui_motion_module = gr.Dropdown(
+        label="Motion Module",
+        value="None",
+        choices=get_motion_module_list(),
+        visible=False,
+        elem_id="animatediff_motion_module",
+    )
+    ui_motion_module.change(on_motion_module_change, inputs=[ui_motion_module], queue=False, show_progress=False)
 
     ui_checkpoint.change(checkpoint_change, inputs=[ui_checkpoint, ui_forge_preset], show_progress=False)
     ui_vae.change(modules_change, inputs=[ui_vae, ui_forge_preset], queue=False, show_progress=False)
@@ -270,6 +306,7 @@ def forge_main_entry():
         ui_checkpoint,
         ui_vae,
         ui_clip_skip,
+        ui_motion_module,
         ui_forge_unet_storage_dtype_options,
         ui_forge_async_loading,
         ui_forge_pin_shared_memory,
@@ -312,14 +349,29 @@ def on_preset_change(preset: str):
     show_adv_mem = preset in ("flux", "qwen", "wan")
     distilled = preset in ("flux", "lumina", "wan")
     d_label = "Distilled CFG Scale" if preset == "flux" else "Shift"
-    batch_args = {"minimum": 1, "maximum": 97, "step": 16, "label": "Frames", "value": 1} if preset == "wan" else {"minimum": 1, "maximum": 8, "step": 1, "label": "Batch size", "value": 1}
+
+    # AnimateDiff mode - video generation with SD1.5
+    if preset == "animatediff":
+        dynamic_args["animatediff"] = True
+        batch_args = {"minimum": 1, "maximum": 32, "step": 1, "label": "Frames", "value": 16}
+    elif preset == "wan":
+        dynamic_args["animatediff"] = False
+        batch_args = {"minimum": 1, "maximum": 97, "step": 16, "label": "Frames", "value": 1}
+    else:
+        dynamic_args["animatediff"] = False
+        batch_args = {"minimum": 1, "maximum": 8, "step": 1, "label": "Batch size", "value": 1}
 
     additional_modules = [os.path.basename(x) for x in getattr(shared.opts, f"forge_additional_modules_{preset}", [])]
+
+    # Motion module visibility for AnimateDiff
+    show_motion_module = preset == "animatediff"
+    motion_module_choices = get_motion_module_list() if show_motion_module else ["None"]
 
     return [
         gr.update(value=getattr(shared.opts, f"forge_checkpoint_{preset}", shared.opts.sd_model_checkpoint)),  # ui_checkpoint
         gr.update(value=additional_modules),  # ui_vae
         gr.update(visible=show_clip_skip, value=getattr(shared.opts, "CLIP_stop_at_last_layers", 2)),  # ui_clip_skip
+        gr.update(visible=show_motion_module, choices=motion_module_choices, value="None"),  # ui_motion_module
         gr.update(visible=show_basic_mem, value=getattr(shared.opts, "forge_unet_storage_dtype", "Automatic")),  # ui_forge_unet_storage_dtype_options
         gr.update(visible=show_adv_mem, value=getattr(shared.opts, "forge_async_loading", "Queue")),  # ui_forge_async_loading
         gr.update(visible=show_adv_mem, value=getattr(shared.opts, "forge_pin_shared_memory", "CPU")),  # ui_forge_pin_shared_memory

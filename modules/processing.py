@@ -845,12 +845,33 @@ def process_images_inner(p: StableDiffusionProcessing) -> Processed:
 
     _is_video = False
     video_path = None
+    _num_frames = 1
+
     if shared.sd_model.is_wan:
         _times = ((getattr(p, "batch_size", 1) - 1) // 4) + 1  # https://github.com/comfyanonymous/ComfyUI/blob/v0.3.64/comfy_extras/nodes_wan.py#L41
         p.batch_size = (_times - 1) * 4 + 1
         _is_video: bool = _times > 1
         if _is_video:
             p.do_not_save_grid = True
+
+    # AnimateDiff video mode
+    if getattr(shared.sd_model, "is_animatediff", False):
+        from backend.args import dynamic_args
+
+        # Set number of frames from batch size
+        _num_frames = getattr(p, "batch_size", 16)
+        shared.sd_model.set_num_frames(_num_frames)
+        _is_video = _num_frames > 1
+
+        # Load motion module if specified
+        motion_module_name = dynamic_args.get("motion_module")
+        if motion_module_name and motion_module_name != "None":
+            shared.sd_model.load_motion_module(motion_module_name)
+
+        if _is_video:
+            p.do_not_save_grid = True
+            # Inject motion modules before processing
+            shared.sd_model.inject_motion_modules()
 
     if isinstance(p.prompt, list):
         assert len(p.prompt) > 0
@@ -941,7 +962,13 @@ def process_images_inner(p: StableDiffusionProcessing) -> Processed:
             p.subseeds = p.all_subseeds[n * p.batch_size : (n + 1) * p.batch_size]
 
             latent_channels = shared.sd_model.forge_objects.vae.latent_channels
-            _shape = (latent_channels, _times, p.height // opt_f, p.width // opt_f) if shared.sd_model.is_wan else (latent_channels, p.height // opt_f, p.width // opt_f)
+            if shared.sd_model.is_wan:
+                _shape = (latent_channels, _times, p.height // opt_f, p.width // opt_f)
+            elif getattr(shared.sd_model, "is_animatediff", False):
+                # AnimateDiff: use batch dimension for frames
+                _shape = (latent_channels, p.height // opt_f, p.width // opt_f)
+            else:
+                _shape = (latent_channels, p.height // opt_f, p.width // opt_f)
             p.rng = rng.ImageRNG(_shape, p.seeds, subseeds=p.subseeds, subseed_strength=p.subseed_strength, seed_resize_from_h=p.seed_resize_from_h, seed_resize_from_w=p.seed_resize_from_w)
 
             if p.scripts is not None:
@@ -1386,6 +1413,9 @@ class StableDiffusionProcessingTxt2Img(StableDiffusionProcessing):
             x = self.rng.next()
             if shared.sd_model.is_wan:  # enforce batch_size of 1
                 x = x[0].unsqueeze(0)
+            elif getattr(shared.sd_model, "is_animatediff", False):
+                # AnimateDiff: repeat latent for each frame
+                x = shared.sd_model.prepare_noise_for_video(x)
 
             self.sd_model.forge_objects = self.sd_model.forge_objects_after_applying_lora.shallow_copy()
             apply_token_merging(self.sd_model, self.get_token_merging_ratio())
@@ -1862,6 +1892,9 @@ class StableDiffusionProcessingImg2Img(StableDiffusionProcessing):
         x = self.rng.next()
         if shared.sd_model.is_wan:  # enforce batch_size of 1
             x = x[0].unsqueeze(0)
+        elif getattr(shared.sd_model, "is_animatediff", False):
+            # AnimateDiff: repeat latent for each frame
+            x = shared.sd_model.prepare_noise_for_video(x)
 
         if self.initial_noise_multiplier != 1.0:
             self.extra_generation_params["Noise multiplier"] = self.initial_noise_multiplier

@@ -9,6 +9,7 @@ from transformers import modeling_utils
 
 import backend.args
 from backend import memory_management
+from backend.diffusion_engine.animatediff import AnimateDiff
 from backend.diffusion_engine.chroma import Chroma
 from backend.diffusion_engine.flux import Flux
 from backend.diffusion_engine.lumina import Lumina2
@@ -711,8 +712,15 @@ def forge_loader(sd: os.PathLike, additional_state_dicts: list[os.PathLike] = No
         else:
             huggingface_components["scheduler"].config.prediction_type = prediction_types.get(estimated_config.model_type.name, huggingface_components["scheduler"].config.prediction_type)
 
+    # Check if AnimateDiff mode is enabled for SD1.5 models
+    animatediff_enabled = backend.args.dynamic_args.get("animatediff", False)
+
     for M in possible_models:
         if any(type(estimated_config) is x for x in M.matched_guesses):
+            # Use AnimateDiff engine for SD1.5 when AnimateDiff mode is enabled
+            if M == StableDiffusion and animatediff_enabled:
+                print("[AnimateDiff] Loading SD1.5 model with AnimateDiff engine")
+                return AnimateDiff(estimated_config=estimated_config, huggingface_components=huggingface_components)
             return M(estimated_config=estimated_config, huggingface_components=huggingface_components)
 
     print("Failed to recognize model type!")
