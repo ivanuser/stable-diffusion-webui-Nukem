@@ -26,19 +26,21 @@ class VersatileAttention(nn.Module):
         self,
         dim: int,
         num_heads: int = 8,
-        dim_head: int = 64,
+        dim_head: int = None,
         dropout: float = 0.0,
     ):
         super().__init__()
+        # AnimateDiff uses dim as both input and output dimension
+        if dim_head is None:
+            dim_head = dim // num_heads
         self.num_heads = num_heads
         self.dim_head = dim_head
-        inner_dim = num_heads * dim_head
 
-        self.to_q = nn.Linear(dim, inner_dim, bias=False)
-        self.to_k = nn.Linear(dim, inner_dim, bias=False)
-        self.to_v = nn.Linear(dim, inner_dim, bias=False)
+        self.to_q = nn.Linear(dim, dim, bias=False)
+        self.to_k = nn.Linear(dim, dim, bias=False)
+        self.to_v = nn.Linear(dim, dim, bias=False)
         self.to_out = nn.Sequential(
-            nn.Linear(inner_dim, dim),
+            nn.Linear(dim, dim),
             nn.Dropout(dropout),
         )
 
@@ -128,7 +130,6 @@ class TemporalTransformer(nn.Module):
         self,
         in_channels: int,
         num_heads: int = 8,
-        dim_head: int = 64,
         num_layers: int = 1,
         dropout: float = 0.0,
         ff_mult: float = 4.0,
@@ -136,7 +137,9 @@ class TemporalTransformer(nn.Module):
         super().__init__()
 
         self.in_channels = in_channels
-        inner_dim = num_heads * dim_head
+        # AnimateDiff uses in_channels as the inner dimension
+        inner_dim = in_channels
+        dim_head = in_channels // num_heads
 
         self.norm = nn.GroupNorm(32, in_channels, eps=1e-6, affine=True)
         self.proj_in = nn.Linear(in_channels, inner_dim)
@@ -204,7 +207,6 @@ class MotionModule(nn.Module):
         self,
         in_channels: int,
         num_heads: int = 8,
-        dim_head: int = 64,
         num_layers: int = 2,
         dropout: float = 0.0,
     ):
@@ -214,7 +216,6 @@ class MotionModule(nn.Module):
         self.temporal_transformer = TemporalTransformer(
             in_channels=in_channels,
             num_heads=num_heads,
-            dim_head=dim_head,
             num_layers=num_layers,
             dropout=dropout,
         )
@@ -261,7 +262,6 @@ class AnimateDiffModel(nn.Module):
     def __init__(
         self,
         num_heads: int = 8,
-        dim_head: int = 64,
         num_layers: int = 2,
         dropout: float = 0.0,
     ):
@@ -282,7 +282,7 @@ class AnimateDiffModel(nn.Module):
 
             block = nn.Module()
             block.motion_modules = nn.ModuleList([
-                MotionModule(channels, num_heads, dim_head, num_layers, dropout)
+                MotionModule(channels, num_heads, num_layers, dropout)
                 for _ in range(num_modules)
             ])
             self.down_blocks.append(block)
@@ -290,7 +290,7 @@ class AnimateDiffModel(nn.Module):
         # Mid block
         self.mid_block = nn.Module()
         self.mid_block.motion_modules = nn.ModuleList([
-            MotionModule(1280, num_heads, dim_head, num_layers, dropout)
+            MotionModule(1280, num_heads, num_layers, dropout)
         ])
 
         # Up blocks
@@ -301,7 +301,7 @@ class AnimateDiffModel(nn.Module):
 
             block = nn.Module()
             block.motion_modules = nn.ModuleList([
-                MotionModule(channels, num_heads, dim_head, num_layers, dropout)
+                MotionModule(channels, num_heads, num_layers, dropout)
                 for _ in range(num_modules)
             ])
             self.up_blocks.append(block)
