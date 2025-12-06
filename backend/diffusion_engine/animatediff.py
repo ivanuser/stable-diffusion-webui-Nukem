@@ -120,11 +120,12 @@ class AnimateDiff(ForgeDiffusionEngine):
         self.motion_module_name = name
         self.motion_module.set_num_frames(self.num_frames)
 
-        # Move to appropriate device
+        # Move to appropriate device and dtype (fp16 for efficiency)
         device = memory_management.get_torch_device()
-        self.motion_module.to(device)
+        dtype = self.forge_objects.unet.model.computation_dtype
+        self.motion_module.to(device=device, dtype=dtype)
 
-        print(f"[AnimateDiff] Loaded motion module: {name}")
+        print(f"[AnimateDiff] Loaded motion module: {name} (dtype={dtype})")
         return True
 
     def unload_motion_module(self):
