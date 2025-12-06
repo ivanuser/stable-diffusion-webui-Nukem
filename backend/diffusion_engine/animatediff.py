@@ -206,21 +206,8 @@ class AnimateDiff(ForgeDiffusionEngine):
         motion_module = self.motion_module
         num_frames = self.num_frames
 
-        # SD1.5 channel dimensions at each level (model_channels=320, channel_mult=(1,2,4,8))
-        # input_blocks: 320 (0-2), 640 (3-5), 1280 (6-8), 1280 (9-11)
-        # middle_block: 1280
-        # output_blocks: 1280 (0-2), 1280 (3-5), 640 (6-8), 320 (9-11)
-        block_channels = {
-            ("input", 0): 320, ("input", 1): 320, ("input", 2): 320,
-            ("input", 3): 640, ("input", 4): 640, ("input", 5): 640,
-            ("input", 6): 1280, ("input", 7): 1280, ("input", 8): 1280,
-            ("input", 9): 1280, ("input", 10): 1280, ("input", 11): 1280,
-            ("middle", 0): 1280,
-            ("output", 0): 1280, ("output", 1): 1280, ("output", 2): 1280,
-            ("output", 3): 1280, ("output", 4): 1280, ("output", 5): 1280,
-            ("output", 6): 640, ("output", 7): 640, ("output", 8): 640,
-            ("output", 9): 320, ("output", 10): 320, ("output", 11): 320,
-        }
+        # Cache for motion modules by channel count to avoid repeated lookups
+        mm_cache = {}
 
         def temporal_attention_modifier(h, when, transformer_options):
             """Apply temporal attention after spatial processing."""
@@ -231,25 +218,25 @@ class AnimateDiff(ForgeDiffusionEngine):
             if num_frames <= 1:
                 return h
 
-            block_info = transformer_options.get("block", ("unknown", 0))
-            block_type, block_id = block_info
+            # Get actual channel dimension from tensor
+            # h shape: (batch * num_frames, channels, height, width)
+            channels = h.shape[1]
 
-            # Get channel dimension for this block
-            channels = block_channels.get((block_type, block_id))
-            if channels is None:
-                return h
+            # Get the motion module for this channel dimension (with caching)
+            if channels not in mm_cache:
+                mm_cache[channels] = motion_module.get_motion_module_by_channels(channels)
 
-            # Get the motion module for this channel dimension
-            mm = motion_module.get_motion_module_by_channels(channels)
+            mm = mm_cache[channels]
             if mm is None:
                 return h
 
             # Apply temporal attention
-            # h shape: (batch * num_frames, channels, height, width)
             try:
                 h = mm(h, num_frames)
             except Exception as e:
                 # If temporal attention fails, just return original
+                block_info = transformer_options.get("block", ("unknown", 0))
+                block_type, block_id = block_info
                 print(f"[AnimateDiff] Warning: temporal attention failed at {block_type}_{block_id}: {e}")
 
             return h
