@@ -34,67 +34,67 @@ except ImportError:
 
 # Motion modules from the official AnimateDiff repository
 MOTION_MODULES = {
-    "mm_sd_v15_v2.safetensors": {
-        "url": "https://huggingface.co/guoyww/animatediff/resolve/main/mm_sd_v15_v2.safetensors",
+    "mm_sd_v15_v2.ckpt": {
+        "url": "https://huggingface.co/guoyww/animatediff/resolve/main/mm_sd_v15_v2.ckpt",
         "size": "1.82 GB",
         "description": "AnimateDiff v2 - Recommended, good quality general purpose",
     },
-    "mm_sd_v14.safetensors": {
-        "url": "https://huggingface.co/guoyww/animatediff/resolve/main/mm_sd_v14.safetensors",
-        "size": "1.82 GB",
+    "mm_sd_v14.ckpt": {
+        "url": "https://huggingface.co/guoyww/animatediff/resolve/main/mm_sd_v14.ckpt",
+        "size": "1.67 GB",
         "description": "AnimateDiff v1.4 - Original release",
     },
-    "v3_sd15_mm.safetensors": {
-        "url": "https://huggingface.co/guoyww/animatediff/resolve/main/v3_sd15_mm.safetensors",
-        "size": "1.82 GB",
+    "v3_sd15_mm.ckpt": {
+        "url": "https://huggingface.co/guoyww/animatediff/resolve/main/v3_sd15_mm.ckpt",
+        "size": "1.67 GB",
         "description": "AnimateDiff v3 - Improved motion quality",
     },
-    "mm_sd_v15.safetensors": {
-        "url": "https://huggingface.co/guoyww/animatediff/resolve/main/mm_sd_v15.safetensors",
-        "size": "1.82 GB",
+    "mm_sd_v15.ckpt": {
+        "url": "https://huggingface.co/guoyww/animatediff/resolve/main/mm_sd_v15.ckpt",
+        "size": "1.67 GB",
         "description": "AnimateDiff v1.5 - Intermediate version",
     },
 }
 
 # Motion LoRAs for modifying motion characteristics
 MOTION_LORAS = {
-    "v2_lora_ZoomIn.safetensors": {
-        "url": "https://huggingface.co/guoyww/animatediff/resolve/main/v2_lora_ZoomIn.safetensors",
+    "v2_lora_ZoomIn.ckpt": {
+        "url": "https://huggingface.co/guoyww/animatediff/resolve/main/v2_lora_ZoomIn.ckpt",
         "size": "78 MB",
         "description": "Zoom in camera motion",
     },
-    "v2_lora_ZoomOut.safetensors": {
-        "url": "https://huggingface.co/guoyww/animatediff/resolve/main/v2_lora_ZoomOut.safetensors",
+    "v2_lora_ZoomOut.ckpt": {
+        "url": "https://huggingface.co/guoyww/animatediff/resolve/main/v2_lora_ZoomOut.ckpt",
         "size": "78 MB",
         "description": "Zoom out camera motion",
     },
-    "v2_lora_PanLeft.safetensors": {
-        "url": "https://huggingface.co/guoyww/animatediff/resolve/main/v2_lora_PanLeft.safetensors",
+    "v2_lora_PanLeft.ckpt": {
+        "url": "https://huggingface.co/guoyww/animatediff/resolve/main/v2_lora_PanLeft.ckpt",
         "size": "78 MB",
         "description": "Pan left camera motion",
     },
-    "v2_lora_PanRight.safetensors": {
-        "url": "https://huggingface.co/guoyww/animatediff/resolve/main/v2_lora_PanRight.safetensors",
+    "v2_lora_PanRight.ckpt": {
+        "url": "https://huggingface.co/guoyww/animatediff/resolve/main/v2_lora_PanRight.ckpt",
         "size": "78 MB",
         "description": "Pan right camera motion",
     },
-    "v2_lora_TiltUp.safetensors": {
-        "url": "https://huggingface.co/guoyww/animatediff/resolve/main/v2_lora_TiltUp.safetensors",
+    "v2_lora_TiltUp.ckpt": {
+        "url": "https://huggingface.co/guoyww/animatediff/resolve/main/v2_lora_TiltUp.ckpt",
         "size": "78 MB",
         "description": "Tilt up camera motion",
     },
-    "v2_lora_TiltDown.safetensors": {
-        "url": "https://huggingface.co/guoyww/animatediff/resolve/main/v2_lora_TiltDown.safetensors",
+    "v2_lora_TiltDown.ckpt": {
+        "url": "https://huggingface.co/guoyww/animatediff/resolve/main/v2_lora_TiltDown.ckpt",
         "size": "78 MB",
         "description": "Tilt down camera motion",
     },
-    "v2_lora_RollingClockwise.safetensors": {
-        "url": "https://huggingface.co/guoyww/animatediff/resolve/main/v2_lora_RollingClockwise.safetensors",
+    "v2_lora_RollingClockwise.ckpt": {
+        "url": "https://huggingface.co/guoyww/animatediff/resolve/main/v2_lora_RollingClockwise.ckpt",
         "size": "78 MB",
         "description": "Rolling clockwise camera motion",
     },
-    "v2_lora_RollingAnticlockwise.safetensors": {
-        "url": "https://huggingface.co/guoyww/animatediff/resolve/main/v2_lora_RollingAnticlockwise.safetensors",
+    "v2_lora_RollingAnticlockwise.ckpt": {
+        "url": "https://huggingface.co/guoyww/animatediff/resolve/main/v2_lora_RollingAnticlockwise.ckpt",
         "size": "78 MB",
         "description": "Rolling counter-clockwise camera motion",
     },
@@ -251,12 +251,12 @@ Examples:
     elif args.motion_loras:
         download_motion_loras(models_path)
     elif args.minimal:
-        download_motion_modules(models_path, ["mm_sd_v15_v2.safetensors"])
+        download_motion_modules(models_path, ["mm_sd_v15_v2.ckpt"])
     else:
         # Default: download recommended motion module
         print("\nNo option specified. Downloading recommended motion module...")
         print("Use --all to download everything, or --list to see options.\n")
-        download_motion_modules(models_path, ["mm_sd_v15_v2.safetensors"])
+        download_motion_modules(models_path, ["mm_sd_v15_v2.ckpt"])
 
     print("\n" + "=" * 60)
     print("Download complete!")
