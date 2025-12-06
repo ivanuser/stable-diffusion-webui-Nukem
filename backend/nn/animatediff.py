@@ -326,6 +326,23 @@ class AnimateDiffModel(nn.Module):
             return self.motion_modules[key]
         return None
 
+    def get_motion_module_by_channels(self, channels: int) -> Optional[MotionModule]:
+        """Get a motion module that matches the given channel dimension.
+
+        Args:
+            channels: The channel dimension to match
+
+        Returns:
+            A MotionModule with matching input channels, or None
+        """
+        # Find first module with matching channels
+        for block_name, block_channels in self.BLOCK_CHANNELS.items():
+            if block_channels == channels:
+                key = block_name.replace(".", "_")
+                if key in self.motion_modules:
+                    return self.motion_modules[key]
+        return None
+
     @staticmethod
     def from_pretrained(path: str, **kwargs) -> "AnimateDiffModel":
         """Load AnimateDiff motion modules from a pretrained checkpoint.

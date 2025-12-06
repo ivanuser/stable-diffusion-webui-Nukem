@@ -191,22 +191,70 @@ class AnimateDiff(ForgeDiffusionEngine):
     def inject_motion_modules(self):
         """Inject motion modules into the UNet for temporal attention.
 
-        NOTE: Full AnimateDiff integration requires modifying the UNet's internal
-        structure to add temporal attention after each spatial transformer block.
-        This is a placeholder that enables the pipeline to run.
-
-        For proper AnimateDiff, the motion modules need to be inserted inside
-        the UNet's input_blocks, middle_block, and output_blocks after each
-        SpatialTransformer layer.
+        Uses the block_modifier system to add temporal attention after each
+        spatial block in the UNet. This enables video generation by:
+        1. Processing frames as batch through spatial layers
+        2. Applying temporal attention to create coherence between frames
         """
         if self.motion_module is None:
             return
 
-        # For now, we just print that motion module is loaded
-        # Full implementation would require modifying the UNet architecture
-        print(f"[AnimateDiff] Motion module loaded: {self.motion_module_name}")
+        print(f"[AnimateDiff] Injecting motion module: {self.motion_module_name}")
         print(f"[AnimateDiff] Generating {self.num_frames} frames")
-        print("[AnimateDiff] Note: Using simplified temporal consistency (full motion module integration pending)")
+
+        motion_module = self.motion_module
+        num_frames = self.num_frames
+
+        # SD1.5 channel dimensions at each level (model_channels=320, channel_mult=(1,2,4,8))
+        # input_blocks: 320 (0-2), 640 (3-5), 1280 (6-8), 1280 (9-11)
+        # middle_block: 1280
+        # output_blocks: 1280 (0-2), 1280 (3-5), 640 (6-8), 320 (9-11)
+        block_channels = {
+            ("input", 0): 320, ("input", 1): 320, ("input", 2): 320,
+            ("input", 3): 640, ("input", 4): 640, ("input", 5): 640,
+            ("input", 6): 1280, ("input", 7): 1280, ("input", 8): 1280,
+            ("input", 9): 1280, ("input", 10): 1280, ("input", 11): 1280,
+            ("middle", 0): 1280,
+            ("output", 0): 1280, ("output", 1): 1280, ("output", 2): 1280,
+            ("output", 3): 1280, ("output", 4): 1280, ("output", 5): 1280,
+            ("output", 6): 640, ("output", 7): 640, ("output", 8): 640,
+            ("output", 9): 320, ("output", 10): 320, ("output", 11): 320,
+        }
+
+        def temporal_attention_modifier(h, when, transformer_options):
+            """Apply temporal attention after spatial processing."""
+            if when != "after":
+                return h
+
+            # Only apply if we have multiple frames
+            if num_frames <= 1:
+                return h
+
+            block_info = transformer_options.get("block", ("unknown", 0))
+            block_type, block_id = block_info
+
+            # Get channel dimension for this block
+            channels = block_channels.get((block_type, block_id))
+            if channels is None:
+                return h
+
+            # Get the motion module for this channel dimension
+            mm = motion_module.get_motion_module_by_channels(channels)
+            if mm is None:
+                return h
+
+            # Apply temporal attention
+            # h shape: (batch * num_frames, channels, height, width)
+            try:
+                h = mm(h, num_frames)
+            except Exception as e:
+                # If temporal attention fails, just return original
+                print(f"[AnimateDiff] Warning: temporal attention failed at {block_type}_{block_id}: {e}")
+
+            return h
+
+        # Add the block modifier to UNet patcher
+        self.forge_objects.unet.add_block_modifier(temporal_attention_modifier)
 
     def restore_unet_forward(self):
         """Restore the original UNet forward method."""
