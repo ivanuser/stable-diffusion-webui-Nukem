@@ -406,7 +406,7 @@ def on_preset_change(preset: str):
         model_mem = total_vram - 1024
 
     show_clip_skip = preset not in ("qwen", "lumina", "wan")
-    show_basic_mem = preset != "sd"
+    show_basic_mem = preset not in ("sd", "animatediff")
     show_adv_mem = preset in ("flux", "qwen", "wan")
     distilled = preset in ("flux", "lumina", "wan")
     d_label = "Distilled CFG Scale" if preset == "flux" else "Shift"

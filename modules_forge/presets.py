@@ -18,6 +18,7 @@ class PresetArch(Enum):
     qwen = 4
     lumina = 5
     wan = 6
+    animatediff = 7
 
 
 SAMPLERS = {
@@ -27,6 +28,7 @@ SAMPLERS = {
     PresetArch.qwen: "LCM",
     PresetArch.lumina: "Res Multistep",
     PresetArch.wan: "Euler",
+    PresetArch.animatediff: "Euler a",
 }
 
 SCHEDULERS = {
@@ -36,6 +38,7 @@ SCHEDULERS = {
     PresetArch.qwen: "Normal",
     PresetArch.lumina: "Linear Quadratic",
     PresetArch.wan: "Simple",
+    PresetArch.animatediff: "Automatic",
 }
 
 WIDTH = {
@@ -45,6 +48,7 @@ WIDTH = {
     PresetArch.qwen: 896,
     PresetArch.lumina: 1024,
     PresetArch.wan: 1152,
+    PresetArch.animatediff: 512,
 }
 
 HEIGHT = {
@@ -54,6 +58,7 @@ HEIGHT = {
     PresetArch.qwen: 1152,
     PresetArch.lumina: 1024,
     PresetArch.wan: 896,
+    PresetArch.animatediff: 512,
 }
 
 CFG = {
@@ -63,6 +68,7 @@ CFG = {
     PresetArch.qwen: 1.0,
     PresetArch.lumina: 4.5,
     PresetArch.wan: 1.0,
+    PresetArch.animatediff: 6.0,
 }
 
 
@@ -109,7 +115,7 @@ def register(options_templates: dict, options_section: Callable, OptionInfo: "Op
                     f"{name}_i2i_width": OptionInfo(w, "img2img Width", gr.Slider, {"minimum": 64, "maximum": 2048, "step": 8}),
                     f"{name}_i2i_height": OptionInfo(h, "img2img Height", gr.Slider, {"minimum": 64, "maximum": 2048, "step": 8}),
                     f"{name}_i2i_cfg": OptionInfo(cfg, "img2img CFG", gr.Slider, {"minimum": 1, "maximum": 30, "step": 0.1}),
-                    f"{name}_gpu_mb": OptionInfo(inference_vram, "GPU Weights (MB)", gr.Slider, {"visible": (arch is not PresetArch.sd), "minimum": 0, "maximum": total_vram, "step": 1}),
+                    f"{name}_gpu_mb": OptionInfo(inference_vram, "GPU Weights (MB)", gr.Slider, {"visible": (arch not in (PresetArch.sd, PresetArch.animatediff)), "minimum": 0, "maximum": total_vram, "step": 1}),
                 },
             )
         )
