@@ -1,14 +1,13 @@
-# AnimateDiff Temporal Attention Modules
+# AnimateDiff Motion Modules
+# Temporal attention layers for video generation with SD1.5
 # Reference: https://github.com/guoyww/AnimateDiff
-# Adds temporal attention layers to SD1.5 UNet for video generation
 
-import math
 from typing import Optional
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from einops import rearrange, repeat
+from einops import rearrange
 
 from backend.attention import attention_function
 
@@ -20,49 +19,8 @@ def zero_module(module: nn.Module) -> nn.Module:
     return module
 
 
-def sinusoidal_embedding(timesteps: torch.Tensor, dim: int, max_period: int = 10000) -> torch.Tensor:
-    """Create sinusoidal position embeddings."""
-    half = dim // 2
-    freqs = torch.exp(
-        -math.log(max_period) * torch.arange(start=0, end=half, dtype=torch.float32) / half
-    ).to(device=timesteps.device)
-    args = timesteps[:, None].float() * freqs[None]
-    embedding = torch.cat([torch.cos(args), torch.sin(args)], dim=-1)
-    if dim % 2:
-        embedding = torch.cat([embedding, torch.zeros_like(embedding[:, :1])], dim=-1)
-    return embedding
-
-
-class TemporalPositionalEncoding(nn.Module):
-    """Positional encoding for temporal dimension using sinusoidal embeddings."""
-
-    def __init__(self, dim: int, max_frames: int = 32):
-        super().__init__()
-        self.dim = dim
-        self.max_frames = max_frames
-        # Pre-compute position embeddings for efficiency
-        pe = sinusoidal_embedding(torch.arange(max_frames), dim)
-        self.register_buffer("pe", pe, persistent=False)
-
-    def forward(self, x: torch.Tensor, num_frames: int) -> torch.Tensor:
-        """Add positional encoding to temporal tokens.
-
-        Args:
-            x: Input tensor of shape (batch * height * width, num_frames, channels)
-            num_frames: Number of frames in sequence
-
-        Returns:
-            Tensor with positional encoding added
-        """
-        return x + self.pe[:num_frames].unsqueeze(0).to(x.dtype)
-
-
-class TemporalAttention(nn.Module):
-    """Temporal self-attention for video generation.
-
-    Performs attention over the temporal (frame) dimension while keeping
-    spatial dimensions fixed. This is the core of AnimateDiff.
-    """
+class VersatileAttention(nn.Module):
+    """Attention block used in AnimateDiff temporal transformer."""
 
     def __init__(
         self,
@@ -70,20 +28,12 @@ class TemporalAttention(nn.Module):
         num_heads: int = 8,
         dim_head: int = 64,
         dropout: float = 0.0,
-        max_frames: int = 32,
     ):
         super().__init__()
-        self.dim = dim
         self.num_heads = num_heads
         self.dim_head = dim_head
         inner_dim = num_heads * dim_head
 
-        self.scale = dim_head**-0.5
-
-        # Positional encoding
-        self.pos_encoding = TemporalPositionalEncoding(dim, max_frames)
-
-        # Projections
         self.to_q = nn.Linear(dim, inner_dim, bias=False)
         self.to_k = nn.Linear(dim, inner_dim, bias=False)
         self.to_v = nn.Linear(dim, inner_dim, bias=False)
@@ -92,63 +42,42 @@ class TemporalAttention(nn.Module):
             nn.Dropout(dropout),
         )
 
-        # Layer norm
-        self.norm = nn.LayerNorm(dim)
+    def forward(self, x: torch.Tensor, mask=None) -> torch.Tensor:
+        q = self.to_q(x)
+        k = self.to_k(x)
+        v = self.to_v(x)
 
-    def forward(
-        self,
-        x: torch.Tensor,
-        num_frames: int,
-        mask: Optional[torch.Tensor] = None,
-    ) -> torch.Tensor:
-        """Apply temporal attention.
-
-        Args:
-            x: Input tensor of shape (batch, channels, height, width) or
-               (batch * num_frames, channels, height, width) for video
-            num_frames: Number of frames in the video
-            mask: Optional attention mask
-
-        Returns:
-            Output tensor with same shape as input
-        """
-        batch_frames, c, h, w = x.shape
-        batch = batch_frames // num_frames
-
-        # Reshape: (B*T, C, H, W) -> (B*H*W, T, C)
-        x = rearrange(x, "(b t) c h w -> (b h w) t c", t=num_frames)
-
-        # Normalize
-        x_norm = self.norm(x)
-
-        # Add positional encoding
-        x_norm = self.pos_encoding(x_norm, num_frames)
-
-        # Compute Q, K, V
-        q = self.to_q(x_norm)
-        k = self.to_k(x_norm)
-        v = self.to_v(x_norm)
-
-        # Use optimized attention
         out = attention_function(q, k, v, self.num_heads, mask)
+        return self.to_out(out)
 
-        # Project out
-        out = self.to_out(out)
 
-        # Residual connection
-        x = x + out
+class FeedForward(nn.Module):
+    """Feed-forward network for transformer blocks."""
 
-        # Reshape back: (B*H*W, T, C) -> (B*T, C, H, W)
-        x = rearrange(x, "(b h w) t c -> (b t) c h w", b=batch, h=h, w=w)
+    def __init__(self, dim: int, mult: float = 4.0, dropout: float = 0.0):
+        super().__init__()
+        inner_dim = int(dim * mult)
+        self.net = nn.Sequential(
+            nn.Linear(dim, inner_dim),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(inner_dim, dim),
+            nn.Dropout(dropout),
+        )
 
-        return x
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.net(x)
 
 
 class TemporalTransformerBlock(nn.Module):
-    """A transformer block with temporal attention for AnimateDiff.
+    """A single transformer block with temporal attention.
 
-    This block is inserted after spatial attention blocks in the UNet.
-    It only processes the temporal dimension, leaving spatial dimensions unchanged.
+    Matches AnimateDiff checkpoint structure:
+    - attention_blocks.0: temporal self-attention
+    - attention_blocks.1: (optional) cross-attention
+    - norms.0, norms.1: layer norms
+    - ff: feed-forward
+    - ff_norm: ff layer norm
     """
 
     def __init__(
@@ -157,63 +86,118 @@ class TemporalTransformerBlock(nn.Module):
         num_heads: int = 8,
         dim_head: int = 64,
         dropout: float = 0.0,
-        max_frames: int = 32,
         ff_mult: float = 4.0,
     ):
         super().__init__()
 
-        # Temporal attention
-        self.temporal_attn = TemporalAttention(
-            dim=dim,
-            num_heads=num_heads,
-            dim_head=dim_head,
-            dropout=dropout,
-            max_frames=max_frames,
-        )
+        # Attention blocks
+        self.attention_blocks = nn.ModuleList([
+            VersatileAttention(dim, num_heads, dim_head, dropout),
+        ])
 
-        # Feed-forward network
-        ff_inner_dim = int(dim * ff_mult)
-        self.ff = nn.Sequential(
+        # Layer norms
+        self.norms = nn.ModuleList([
             nn.LayerNorm(dim),
-            nn.Linear(dim, ff_inner_dim),
-            nn.GELU(),
-            nn.Dropout(dropout),
-            nn.Linear(ff_inner_dim, dim),
-            nn.Dropout(dropout),
-        )
+        ])
 
-        # Initialize output projection to zero for stable training
-        self.temporal_attn.to_out = zero_module(self.temporal_attn.to_out)
+        # Feed-forward
+        self.ff = FeedForward(dim, mult=ff_mult, dropout=dropout)
+        self.ff_norm = nn.LayerNorm(dim)
 
-    def forward(self, x: torch.Tensor, num_frames: int) -> torch.Tensor:
-        """Apply temporal transformer block.
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        # Self-attention with residual
+        x = self.attention_blocks[0](self.norms[0](x)) + x
 
-        Args:
-            x: Input tensor of shape (batch * num_frames, channels, height, width)
-            num_frames: Number of frames in the video
-
-        Returns:
-            Output tensor with same shape as input
-        """
-        # Temporal attention
-        x = self.temporal_attn(x, num_frames)
-
-        # Feed-forward (reshape for linear layers)
-        batch_frames, c, h, w = x.shape
-        batch = batch_frames // num_frames
-
-        x_flat = rearrange(x, "(b t) c h w -> (b h w) t c", t=num_frames)
-        x_flat = x_flat + self.ff(x_flat)
-        x = rearrange(x_flat, "(b h w) t c -> (b t) c h w", b=batch, h=h, w=w)
+        # Feed-forward with residual
+        x = self.ff(self.ff_norm(x)) + x
 
         return x
 
 
-class MotionModule(nn.Module):
-    """Motion module wrapper that contains multiple temporal transformer blocks.
+class TemporalTransformer(nn.Module):
+    """Temporal transformer module.
 
-    This module is inserted at specific positions in the UNet to add
-    temporal attention capabilities.
+    Matches AnimateDiff checkpoint structure:
+    - norm: input layer norm
+    - proj_in: input projection
+    - transformer_blocks: list of transformer blocks
+    - proj_out: output projection
+    """
+
+    def __init__(
+        self,
+        in_channels: int,
+        num_heads: int = 8,
+        dim_head: int = 64,
+        num_layers: int = 1,
+        dropout: float = 0.0,
+        ff_mult: float = 4.0,
+    ):
+        super().__init__()
+
+        self.in_channels = in_channels
+        inner_dim = num_heads * dim_head
+
+        self.norm = nn.GroupNorm(32, in_channels, eps=1e-6, affine=True)
+        self.proj_in = nn.Linear(in_channels, inner_dim)
+
+        self.transformer_blocks = nn.ModuleList([
+            TemporalTransformerBlock(
+                dim=inner_dim,
+                num_heads=num_heads,
+                dim_head=dim_head,
+                dropout=dropout,
+                ff_mult=ff_mult,
+            )
+            for _ in range(num_layers)
+        ])
+
+        self.proj_out = nn.Linear(inner_dim, in_channels)
+
+    def forward(self, x: torch.Tensor, num_frames: int) -> torch.Tensor:
+        """Apply temporal transformer.
+
+        Args:
+            x: Input tensor of shape (batch * num_frames, channels, height, width)
+            num_frames: Number of frames
+
+        Returns:
+            Output tensor with same shape as input
+        """
+        batch_frames, c, h, w = x.shape
+        batch = batch_frames // num_frames
+
+        # Store residual
+        residual = x
+
+        # Normalize
+        x = self.norm(x)
+
+        # Reshape: (B*T, C, H, W) -> (B*H*W, T, C)
+        x = rearrange(x, "(b t) c h w -> (b h w) t c", t=num_frames)
+
+        # Project in
+        x = self.proj_in(x)
+
+        # Apply transformer blocks
+        for block in self.transformer_blocks:
+            x = block(x)
+
+        # Project out
+        x = self.proj_out(x)
+
+        # Reshape back: (B*H*W, T, C) -> (B*T, C, H, W)
+        x = rearrange(x, "(b h w) t c -> (b t) c h w", b=batch, h=h, w=w)
+
+        # Residual connection
+        return x + residual
+
+
+class MotionModule(nn.Module):
+    """Motion module containing a temporal transformer.
+
+    This wraps a TemporalTransformer and is inserted at specific
+    positions in the UNet.
     """
 
     def __init__(
@@ -223,58 +207,32 @@ class MotionModule(nn.Module):
         dim_head: int = 64,
         num_layers: int = 2,
         dropout: float = 0.0,
-        max_frames: int = 32,
-        ff_mult: float = 4.0,
     ):
         super().__init__()
 
         self.in_channels = in_channels
-        self.num_frames = None  # Set during forward pass
+        self.temporal_transformer = TemporalTransformer(
+            in_channels=in_channels,
+            num_heads=num_heads,
+            dim_head=dim_head,
+            num_layers=num_layers,
+            dropout=dropout,
+        )
 
-        self.temporal_blocks = nn.ModuleList([
-            TemporalTransformerBlock(
-                dim=in_channels,
-                num_heads=num_heads,
-                dim_head=dim_head,
-                dropout=dropout,
-                max_frames=max_frames,
-                ff_mult=ff_mult,
-            )
-            for _ in range(num_layers)
-        ])
-
-    def forward(self, x: torch.Tensor, num_frames: int = None) -> torch.Tensor:
-        """Apply motion module.
-
-        Args:
-            x: Input tensor of shape (batch * num_frames, channels, height, width)
-            num_frames: Number of frames (uses stored value if None)
-
-        Returns:
-            Output tensor with temporal motion applied
-        """
-        if num_frames is None:
-            num_frames = self.num_frames
-
-        if num_frames is None or num_frames <= 1:
-            # No temporal processing needed for single frame
-            return x
-
-        for block in self.temporal_blocks:
-            x = block(x, num_frames)
-
-        return x
+    def forward(self, x: torch.Tensor, num_frames: int) -> torch.Tensor:
+        return self.temporal_transformer(x, num_frames)
 
 
 class AnimateDiffModel(nn.Module):
-    """AnimateDiff model wrapper.
+    """AnimateDiff model matching the official checkpoint structure.
 
-    This class manages motion modules and their injection into a SD1.5 UNet.
-    Motion modules are loaded from pretrained weights or initialized fresh.
+    Structure:
+    - down_blocks.{0,1,2,3}.motion_modules.{0,1}
+    - mid_block.motion_modules.0
+    - up_blocks.{0,1,2,3}.motion_modules.{0,1,2}
     """
 
-    # Block configuration for SD1.5 UNet
-    # Maps block names to their channel dimensions
+    # SD1.5 UNet block channel dimensions
     BLOCK_CHANNELS = {
         "down_blocks.0": 320,
         "down_blocks.1": 640,
@@ -287,73 +245,98 @@ class AnimateDiffModel(nn.Module):
         "up_blocks.3": 320,
     }
 
+    # Number of motion modules per block
+    MODULES_PER_BLOCK = {
+        "down_blocks.0": 2,
+        "down_blocks.1": 2,
+        "down_blocks.2": 2,
+        "down_blocks.3": 1,  # No downsampling in last block
+        "mid_block": 1,
+        "up_blocks.0": 3,
+        "up_blocks.1": 3,
+        "up_blocks.2": 3,
+        "up_blocks.3": 3,
+    }
+
     def __init__(
         self,
         num_heads: int = 8,
         dim_head: int = 64,
         num_layers: int = 2,
         dropout: float = 0.0,
-        max_frames: int = 32,
     ):
         super().__init__()
 
-        self.num_frames = 16  # Default frame count
-        self.max_frames = max_frames
+        self.num_frames = 16
 
-        # Create motion modules for each block
-        self.motion_modules = nn.ModuleDict()
+        # Create block structure matching checkpoint
+        self.down_blocks = nn.ModuleList()
+        self.up_blocks = nn.ModuleList()
+        self.mid_block = None
 
-        for block_name, channels in self.BLOCK_CHANNELS.items():
-            self.motion_modules[block_name.replace(".", "_")] = MotionModule(
-                in_channels=channels,
-                num_heads=num_heads,
-                dim_head=dim_head,
-                num_layers=num_layers,
-                dropout=dropout,
-                max_frames=max_frames,
-            )
+        # Down blocks
+        for i in range(4):
+            block_name = f"down_blocks.{i}"
+            channels = self.BLOCK_CHANNELS[block_name]
+            num_modules = self.MODULES_PER_BLOCK[block_name]
+
+            block = nn.Module()
+            block.motion_modules = nn.ModuleList([
+                MotionModule(channels, num_heads, dim_head, num_layers, dropout)
+                for _ in range(num_modules)
+            ])
+            self.down_blocks.append(block)
+
+        # Mid block
+        self.mid_block = nn.Module()
+        self.mid_block.motion_modules = nn.ModuleList([
+            MotionModule(1280, num_heads, dim_head, num_layers, dropout)
+        ])
+
+        # Up blocks
+        for i in range(4):
+            block_name = f"up_blocks.{i}"
+            channels = self.BLOCK_CHANNELS[block_name]
+            num_modules = self.MODULES_PER_BLOCK[block_name]
+
+            block = nn.Module()
+            block.motion_modules = nn.ModuleList([
+                MotionModule(channels, num_heads, dim_head, num_layers, dropout)
+                for _ in range(num_modules)
+            ])
+            self.up_blocks.append(block)
 
     def set_num_frames(self, num_frames: int):
         """Set the number of frames for video generation."""
-        self.num_frames = min(num_frames, self.max_frames)
-        for module in self.motion_modules.values():
-            module.num_frames = self.num_frames
-
-    def get_motion_module(self, block_name: str) -> Optional[MotionModule]:
-        """Get the motion module for a specific UNet block."""
-        key = block_name.replace(".", "_")
-        if key in self.motion_modules:
-            return self.motion_modules[key]
-        return None
+        self.num_frames = num_frames
 
     def get_motion_module_by_channels(self, channels: int) -> Optional[MotionModule]:
         """Get a motion module that matches the given channel dimension.
 
-        Args:
-            channels: The channel dimension to match
-
-        Returns:
-            A MotionModule with matching input channels, or None
+        Returns the first motion module with matching channels.
         """
-        # Find first module with matching channels
-        for block_name, block_channels in self.BLOCK_CHANNELS.items():
-            if block_channels == channels:
-                key = block_name.replace(".", "_")
-                if key in self.motion_modules:
-                    return self.motion_modules[key]
+        # Check down blocks
+        for block in self.down_blocks:
+            for mm in block.motion_modules:
+                if mm.in_channels == channels:
+                    return mm
+
+        # Check mid block
+        for mm in self.mid_block.motion_modules:
+            if mm.in_channels == channels:
+                return mm
+
+        # Check up blocks
+        for block in self.up_blocks:
+            for mm in block.motion_modules:
+                if mm.in_channels == channels:
+                    return mm
+
         return None
 
     @staticmethod
     def from_pretrained(path: str, **kwargs) -> "AnimateDiffModel":
-        """Load AnimateDiff motion modules from a pretrained checkpoint.
-
-        Args:
-            path: Path to the motion module checkpoint (.safetensors or .pth)
-            **kwargs: Additional arguments passed to AnimateDiffModel
-
-        Returns:
-            Initialized AnimateDiffModel with loaded weights
-        """
+        """Load AnimateDiff motion modules from a pretrained checkpoint."""
         import os
 
         model = AnimateDiffModel(**kwargs)
@@ -365,38 +348,27 @@ class AnimateDiffModel(nn.Module):
         # Load weights
         if path.endswith(".safetensors"):
             import safetensors.torch
-
             state_dict = safetensors.torch.load_file(path)
         else:
-            # .ckpt files may contain non-tensor data
             state_dict = torch.load(path, map_location="cpu", weights_only=False)
 
         # Handle different state dict formats
         if "state_dict" in state_dict:
             state_dict = state_dict["state_dict"]
 
-        # Debug: print some keys to understand structure
-        keys = list(state_dict.keys())
-        print(f"[AnimateDiff] Checkpoint has {len(keys)} keys")
-        if keys:
-            print(f"[AnimateDiff] Sample keys: {keys[:5]}")
+        print(f"[AnimateDiff] Checkpoint has {len(state_dict)} keys")
 
-        # AnimateDiff checkpoints use a specific naming convention
-        # Keys look like: "down_blocks.0.motion_modules.0.temporal_transformer..."
-        # We need to map these to our structure
-
-        # Try to load weights with key remapping if needed
+        # Load weights
         try:
             missing, unexpected = model.load_state_dict(state_dict, strict=False)
+            loaded = len(state_dict) - len(unexpected)
+            print(f"[AnimateDiff] Loaded {loaded}/{len(state_dict)} keys from checkpoint")
             if missing:
                 print(f"[AnimateDiff] Missing keys: {len(missing)}")
             if unexpected:
-                print(f"[AnimateDiff] Unexpected keys: {len(unexpected)} (checkpoint uses different structure)")
-                # The checkpoint has a different structure - we need to handle it
-                print(f"[AnimateDiff] Checkpoint structure sample: {unexpected[:3]}")
-            print(f"[AnimateDiff] Loaded motion module from: {path}")
+                print(f"[AnimateDiff] Unexpected keys: {len(unexpected)}")
         except Exception as e:
-            print(f"[AnimateDiff] Warning: Could not load motion module: {e}")
+            print(f"[AnimateDiff] Error loading checkpoint: {e}")
 
         return model
 
@@ -421,14 +393,7 @@ def get_motion_module_list() -> list:
 
 
 def load_motion_module(name: str) -> Optional[AnimateDiffModel]:
-    """Load a motion module by name.
-
-    Args:
-        name: Name of the motion module file
-
-    Returns:
-        Loaded AnimateDiffModel or None if not found
-    """
+    """Load a motion module by name."""
     import os
     from modules import paths
 
