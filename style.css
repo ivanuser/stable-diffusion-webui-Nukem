@@ -1745,3 +1745,51 @@ body.resizing .resize-handle {
     min-width: 0 !important;
     margin: auto 2em;
 }
+
+/* AnimateDiff UI improvements */
+#quicksettings {
+    flex-wrap: wrap;
+    gap: 0.5em 1em;
+}
+
+#quicksettings > div,
+#quicksettings > fieldset {
+    min-width: fit-content;
+}
+
+/* UI Preset radio - make horizontal and compact */
+#forge_ui_preset {
+    min-width: 25em !important;
+}
+
+#forge_ui_preset .wrap {
+    gap: 0.3em;
+}
+
+#forge_ui_preset label {
+    padding: 0.3em 0.6em !important;
+    min-width: auto !important;
+}
+
+/* Motion module and LoRA dropdowns */
+#animatediff_motion_module,
+#animatediff_motion_lora {
+    min-width: 12em !important;
+    max-width: 16em;
+}
+
+#animatediff_motion_lora_strength {
+    min-width: 10em !important;
+    max-width: 14em;
+}
+
+/* Checkpoint dropdown */
+#quicksettings > div.model_selection {
+    min-width: 14em !important;
+    max-width: 20em;
+}
+
+/* Clip skip slider */
+#quicksettings .gradio-slider {
+    min-width: 10em !important;
+}

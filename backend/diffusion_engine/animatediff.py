@@ -121,7 +121,7 @@ class AnimateDiff(ForgeDiffusionEngine):
         self.motion_module.set_num_frames(self.num_frames)
 
         # Move to appropriate device
-        device = self.forge_objects.unet.model.device
+        device = memory_management.get_torch_device()
         self.motion_module.to(device)
 
         print(f"[AnimateDiff] Loaded motion module: {name}")
