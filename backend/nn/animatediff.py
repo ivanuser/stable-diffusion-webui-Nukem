@@ -368,15 +368,32 @@ class AnimateDiffModel(nn.Module):
 
             state_dict = safetensors.torch.load_file(path)
         else:
-            state_dict = torch.load(path, map_location="cpu", weights_only=True)
+            # .ckpt files may contain non-tensor data
+            state_dict = torch.load(path, map_location="cpu", weights_only=False)
 
         # Handle different state dict formats
         if "state_dict" in state_dict:
             state_dict = state_dict["state_dict"]
 
+        # Debug: print some keys to understand structure
+        keys = list(state_dict.keys())
+        print(f"[AnimateDiff] Checkpoint has {len(keys)} keys")
+        if keys:
+            print(f"[AnimateDiff] Sample keys: {keys[:5]}")
+
+        # AnimateDiff checkpoints use a specific naming convention
+        # Keys look like: "down_blocks.0.motion_modules.0.temporal_transformer..."
+        # We need to map these to our structure
+
         # Try to load weights with key remapping if needed
         try:
-            model.load_state_dict(state_dict, strict=False)
+            missing, unexpected = model.load_state_dict(state_dict, strict=False)
+            if missing:
+                print(f"[AnimateDiff] Missing keys: {len(missing)}")
+            if unexpected:
+                print(f"[AnimateDiff] Unexpected keys: {len(unexpected)} (checkpoint uses different structure)")
+                # The checkpoint has a different structure - we need to handle it
+                print(f"[AnimateDiff] Checkpoint structure sample: {unexpected[:3]}")
             print(f"[AnimateDiff] Loaded motion module from: {path}")
         except Exception as e:
             print(f"[AnimateDiff] Warning: Could not load motion module: {e}")
