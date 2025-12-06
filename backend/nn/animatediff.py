@@ -322,7 +322,9 @@ class AnimateDiffModel(nn.Module):
     def get_motion_module(self, block_name: str) -> Optional[MotionModule]:
         """Get the motion module for a specific UNet block."""
         key = block_name.replace(".", "_")
-        return self.motion_modules.get(key)
+        if key in self.motion_modules:
+            return self.motion_modules[key]
+        return None
 
     @staticmethod
     def from_pretrained(path: str, **kwargs) -> "AnimateDiffModel":
