@@ -290,8 +290,15 @@ class CivitAIClient:
             params["period"] = period
         if limit:
             params["limit"] = min(limit, 100)  # API max is 100
-        if page and not cursor:
+
+        # CivitAI API requires cursor-based pagination when using query search
+        # Page parameter can only be used for non-query browsing
+        if cursor:
+            params["cursor"] = cursor
+        elif page and page > 1 and not query:
+            # Only use page param when not searching (no query) and not first page
             params["page"] = page
+
         if nsfw is not None:
             params["nsfw"] = str(nsfw).lower()
         if tag:
@@ -300,8 +307,6 @@ class CivitAIClient:
             params["username"] = username
         if base_models:
             params["baseModels"] = ",".join(base_models)
-        if cursor:
-            params["cursor"] = cursor
 
         data = self._make_request("GET", "/models", params=params)
         return CivitAISearchResult.from_api_response(data)

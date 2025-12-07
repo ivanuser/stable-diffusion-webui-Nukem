@@ -59,6 +59,9 @@ class CivitAIBrowser:
         self.selected_model: Optional[CivitAIModel] = None
         self.current_page = 1
         self.total_pages = 1
+        self.next_cursor: Optional[str] = None  # For cursor-based pagination
+        self.last_query: Optional[str] = None  # Track query for pagination
+        self.cursor_history: list[str] = []  # Stack of cursors for "previous" navigation
 
     def search(
         self,
@@ -68,6 +71,7 @@ class CivitAIBrowser:
         period: str,
         base_model: str,
         page: int = 1,
+        use_cursor: str = None,  # Cursor for pagination
     ):
         """Search CivitAI for models. Returns gallery data and status."""
         try:
@@ -88,6 +92,8 @@ class CivitAIBrowser:
 
             limit = getattr(shared.opts, "civitai_results_per_page", 20)
 
+            # Use cursor-based pagination when we have a query
+            # Otherwise use page-based pagination for browsing
             results = client.search_models(
                 query=query if query else None,
                 model_type=type_filter,
@@ -95,8 +101,13 @@ class CivitAIBrowser:
                 period=period,
                 base_models=base_models,
                 limit=limit,
-                page=int(page),
+                page=int(page) if not query else None,  # Only use page when not searching
+                cursor=use_cursor,  # Use cursor for query-based pagination
             )
+
+            # Store cursor for next page
+            self.next_cursor = results.next_cursor
+            self.last_query = query
 
             self.current_results = results.items
             self.current_page = results.current_page
@@ -439,13 +450,31 @@ def create_ui():
         )
 
         def go_prev(query, mtype, sort, period, base, page):
-            new_page = max(1, int(page) - 1)
-            result = browser.search(query, mtype, sort, period, base, new_page)
-            return (new_page,) + result
+            # For query searches, cursor-based pagination doesn't support "previous"
+            # so we just decrement the visual page counter but can't actually go back
+            # For non-query browsing, we can use page-based pagination
+            if query:
+                # Can't go back with cursor-based pagination
+                # Just show current results again
+                return (int(page),) + (browser.current_results and (
+                    [(m.preview_image.url if m.preview_image else None, f"{m.name} ({m.type})") for m in browser.current_results],
+                    f"Note: Previous page not available for search queries",
+                    f"Page {browser.current_page}",
+                    gr.update(),
+                ) or ([], "No results", "Page 0", gr.update(choices=[])))
+            else:
+                new_page = max(1, int(page) - 1)
+                result = browser.search(query, mtype, sort, period, base, new_page)
+                return (new_page,) + result
 
         def go_next(query, mtype, sort, period, base, page):
             new_page = int(page) + 1
-            result = browser.search(query, mtype, sort, period, base, new_page)
+            if query and browser.next_cursor:
+                # Use cursor for query-based pagination
+                result = browser.search(query, mtype, sort, period, base, new_page, use_cursor=browser.next_cursor)
+            else:
+                # Use page-based pagination for browsing
+                result = browser.search(query, mtype, sort, period, base, new_page)
             return (new_page,) + result
 
         prev_btn.click(
