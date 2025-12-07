@@ -250,15 +250,28 @@ class TemporalTransformer3DModel(nn.Module):
         # Reshape: (B*T, C, H, W) -> (B*H*W, T, C)
         x = rearrange(x, "(b t) c h w -> (b h w) t c", t=num_frames)
 
-        # Project in
-        x = self.proj_in(x)
+        # For memory efficiency, process in spatial chunks if tensor is large
+        # This reduces peak memory at the cost of slightly more compute
+        num_spatial = x.shape[0]  # B*H*W
+        chunk_size = 1024  # Process 1024 spatial positions at a time
 
-        # Apply transformer blocks
-        for block in self.transformer_blocks:
-            x = block(x)
-
-        # Project out
-        x = self.proj_out(x)
+        if num_spatial > chunk_size:
+            # Chunked processing for memory efficiency
+            outputs = []
+            for i in range(0, num_spatial, chunk_size):
+                chunk = x[i:i + chunk_size]
+                chunk = self.proj_in(chunk)
+                for block in self.transformer_blocks:
+                    chunk = block(chunk)
+                chunk = self.proj_out(chunk)
+                outputs.append(chunk)
+            x = torch.cat(outputs, dim=0)
+        else:
+            # Standard processing for small tensors
+            x = self.proj_in(x)
+            for block in self.transformer_blocks:
+                x = block(x)
+            x = self.proj_out(x)
 
         # Reshape back: (B*H*W, T, C) -> (B*T, C, H, W)
         x = rearrange(x, "(b h w) t c -> (b t) c h w", b=batch, h=h, w=w)
@@ -434,11 +447,9 @@ class AnimateDiffModel(nn.Module):
         """Load AnimateDiff motion modules from a pretrained checkpoint."""
         import os
 
-        model = AnimateDiffModel(**kwargs)
-
         if not os.path.exists(path):
             print(f"[AnimateDiff] Motion module not found: {path}")
-            return model
+            return AnimateDiffModel(**kwargs)
 
         # Load weights
         if path.endswith(".safetensors"):
@@ -453,22 +464,46 @@ class AnimateDiffModel(nn.Module):
 
         print(f"[AnimateDiff] Checkpoint has {len(state_dict)} keys")
 
+        # Detect model type from checkpoint
+        has_mid_block = any(k.startswith("mid_block.") for k in state_dict.keys())
+
+        # Detect temporal_max_len from pe buffer shape
+        temporal_max_len = 24  # Default for v1
+        for key in state_dict.keys():
+            if "pos_encoder.pe" in key:
+                pe_shape = state_dict[key].shape
+                temporal_max_len = pe_shape[1]  # Shape is (1, max_len, dim)
+                break
+
+        # If v3 (no mid_block, max_len=32), use v3-specific settings
+        if not has_mid_block and temporal_max_len == 32:
+            print(f"[AnimateDiff] Detected v3 model (no mid_block, max_len={temporal_max_len})")
+        elif has_mid_block:
+            print(f"[AnimateDiff] Detected v2 model (has mid_block, max_len={temporal_max_len})")
+        else:
+            print(f"[AnimateDiff] Detected v1 model (no mid_block, max_len={temporal_max_len})")
+
+        # Create model with detected settings
+        model = AnimateDiffModel(temporal_max_len=temporal_max_len, **kwargs)
+
         # Debug: show some checkpoint keys
         sample_keys = list(state_dict.keys())[:5]
         print(f"[AnimateDiff] Sample checkpoint keys: {sample_keys}")
-
-        # Debug: show model keys
-        model_keys = list(model.state_dict().keys())[:5]
-        print(f"[AnimateDiff] Sample model keys: {model_keys}")
 
         # Load weights
         try:
             missing, unexpected = model.load_state_dict(state_dict, strict=False)
             loaded = len(state_dict) - len(unexpected)
             print(f"[AnimateDiff] Loaded {loaded}/{len(state_dict)} keys from checkpoint")
+
+            # Filter out expected missing keys (mid_block for v1/v3)
+            if not has_mid_block:
+                missing = [k for k in missing if not k.startswith("mid_block.")]
+
             if missing:
                 print(f"[AnimateDiff] Missing keys: {len(missing)}")
-                print(f"[AnimateDiff] Sample missing: {missing[:3]}")
+                if missing:
+                    print(f"[AnimateDiff] Sample missing: {missing[:3]}")
             if unexpected:
                 print(f"[AnimateDiff] Unexpected keys: {len(unexpected)}")
                 print(f"[AnimateDiff] Sample unexpected: {unexpected[:3]}")
