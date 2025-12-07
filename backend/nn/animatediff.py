@@ -3,6 +3,7 @@
 # Reference: https://github.com/guoyww/AnimateDiff
 
 from typing import Optional
+import math
 
 import torch
 import torch.nn as nn
@@ -12,59 +13,115 @@ from einops import rearrange
 from backend.attention import attention_function
 
 
-def zero_module(module: nn.Module) -> nn.Module:
-    """Zero out the parameters of a module and return it."""
-    for p in module.parameters():
-        p.detach().zero_()
-    return module
+class PositionalEncoding(nn.Module):
+    """Sinusoidal positional encoding for temporal sequences."""
+
+    def __init__(self, d_model: int, max_len: int = 32, dropout: float = 0.0):
+        super().__init__()
+        self.dropout = nn.Dropout(p=dropout)
+
+        # Create positional encoding buffer
+        pe = torch.zeros(1, max_len, d_model)
+        position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
+        div_term = torch.exp(torch.arange(0, d_model, 2).float() * (-math.log(10000.0) / d_model))
+        pe[0, :, 0::2] = torch.sin(position * div_term)
+        if d_model % 2 == 1:
+            pe[0, :, 1::2] = torch.cos(position * div_term[:-1])
+        else:
+            pe[0, :, 1::2] = torch.cos(position * div_term)
+        self.register_buffer('pe', pe)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        # x: (batch, seq_len, dim)
+        x = x + self.pe[:, :x.size(1), :]
+        return self.dropout(x)
 
 
 class VersatileAttention(nn.Module):
-    """Attention block used in AnimateDiff temporal transformer."""
+    """Attention block with positional encoding for AnimateDiff.
+
+    Matches the CrossAttention structure from ldm.modules.attention.
+    """
 
     def __init__(
         self,
-        dim: int,
-        num_heads: int = 8,
-        dim_head: int = None,
+        query_dim: int,
+        context_dim: Optional[int] = None,
+        heads: int = 8,
+        dim_head: int = 64,
         dropout: float = 0.0,
+        temporal_position_encoding: bool = True,
+        temporal_position_encoding_max_len: int = 32,
     ):
         super().__init__()
-        # AnimateDiff uses dim as both input and output dimension
-        if dim_head is None:
-            dim_head = dim // num_heads
-        self.num_heads = num_heads
+        inner_dim = dim_head * heads
+        context_dim = context_dim if context_dim is not None else query_dim
+
+        self.heads = heads
         self.dim_head = dim_head
 
-        self.to_q = nn.Linear(dim, dim, bias=False)
-        self.to_k = nn.Linear(dim, dim, bias=False)
-        self.to_v = nn.Linear(dim, dim, bias=False)
+        self.to_q = nn.Linear(query_dim, inner_dim, bias=False)
+        self.to_k = nn.Linear(context_dim, inner_dim, bias=False)
+        self.to_v = nn.Linear(context_dim, inner_dim, bias=False)
+
         self.to_out = nn.Sequential(
-            nn.Linear(dim, dim),
+            nn.Linear(inner_dim, query_dim),
             nn.Dropout(dropout),
         )
 
-    def forward(self, x: torch.Tensor, mask=None) -> torch.Tensor:
-        q = self.to_q(x)
-        k = self.to_k(x)
-        v = self.to_v(x)
+        # Positional encoding for temporal dimension
+        if temporal_position_encoding:
+            self.pos_encoder = PositionalEncoding(
+                query_dim,
+                max_len=temporal_position_encoding_max_len,
+                dropout=dropout
+            )
+        else:
+            self.pos_encoder = None
 
-        out = attention_function(q, k, v, self.num_heads, mask)
+    def forward(self, x: torch.Tensor, context=None, mask=None) -> torch.Tensor:
+        # Add positional encoding
+        if self.pos_encoder is not None:
+            x = self.pos_encoder(x)
+
+        context = context if context is not None else x
+
+        q = self.to_q(x)
+        k = self.to_k(context)
+        v = self.to_v(context)
+
+        out = attention_function(q, k, v, self.heads, mask)
         return self.to_out(out)
 
 
-class FeedForward(nn.Module):
-    """Feed-forward network for transformer blocks."""
+class GEGLU(nn.Module):
+    """Gated Linear Unit with GELU activation."""
 
-    def __init__(self, dim: int, mult: float = 4.0, dropout: float = 0.0):
+    def __init__(self, dim_in: int, dim_out: int):
+        super().__init__()
+        self.proj = nn.Linear(dim_in, dim_out * 2)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x, gate = self.proj(x).chunk(2, dim=-1)
+        return x * F.gelu(gate)
+
+
+class FeedForward(nn.Module):
+    """Feed-forward network for transformer blocks.
+
+    Matches ldm.modules.attention.FeedForward with glu=True.
+    """
+
+    def __init__(self, dim: int, dim_out: Optional[int] = None, mult: float = 4.0, dropout: float = 0.0):
         super().__init__()
         inner_dim = int(dim * mult)
+        dim_out = dim_out if dim_out is not None else dim
+
+        # Use GEGLU (glu=True by default in AnimateDiff)
         self.net = nn.Sequential(
-            nn.Linear(dim, inner_dim),
-            nn.GELU(),
+            GEGLU(dim, inner_dim),
             nn.Dropout(dropout),
-            nn.Linear(inner_dim, dim),
-            nn.Dropout(dropout),
+            nn.Linear(inner_dim, dim_out),
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -72,34 +129,43 @@ class FeedForward(nn.Module):
 
 
 class TemporalTransformerBlock(nn.Module):
-    """A single transformer block with temporal attention.
+    """AnimateDiff transformer block matching checkpoint structure.
 
-    Matches AnimateDiff checkpoint structure:
-    - attention_blocks.0: temporal self-attention
-    - attention_blocks.1: (optional) cross-attention
-    - norms.0, norms.1: layer norms
-    - ff: feed-forward
-    - ff_norm: ff layer norm
+    Structure:
+    - attention_blocks: ModuleList of VersatileAttention
+    - norms: ModuleList of LayerNorm (one per attention block)
+    - ff: FeedForward
+    - ff_norm: LayerNorm
     """
 
     def __init__(
         self,
         dim: int,
-        num_heads: int = 8,
-        dim_head: int = 64,
+        num_attention_heads: int = 8,
+        attention_head_dim: int = 64,
+        num_attention_blocks: int = 1,
+        temporal_max_len: int = 32,
         dropout: float = 0.0,
         ff_mult: float = 4.0,
     ):
         super().__init__()
 
-        # Attention blocks
+        # Multiple attention blocks with their norms
         self.attention_blocks = nn.ModuleList([
-            VersatileAttention(dim, num_heads, dim_head, dropout),
+            VersatileAttention(
+                query_dim=dim,
+                heads=num_attention_heads,
+                dim_head=attention_head_dim,
+                dropout=dropout,
+                temporal_position_encoding=True,
+                temporal_position_encoding_max_len=temporal_max_len,
+            )
+            for _ in range(num_attention_blocks)
         ])
 
-        # Layer norms
         self.norms = nn.ModuleList([
-            nn.LayerNorm(dim),
+            nn.LayerNorm(dim)
+            for _ in range(num_attention_blocks)
         ])
 
         # Feed-forward
@@ -107,8 +173,9 @@ class TemporalTransformerBlock(nn.Module):
         self.ff_norm = nn.LayerNorm(dim)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        # Self-attention with residual
-        x = self.attention_blocks[0](self.norms[0](x)) + x
+        # Apply each attention block with residual
+        for attn, norm in zip(self.attention_blocks, self.norms):
+            x = attn(norm(x)) + x
 
         # Feed-forward with residual
         x = self.ff(self.ff_norm(x)) + x
@@ -116,39 +183,43 @@ class TemporalTransformerBlock(nn.Module):
         return x
 
 
-class TemporalTransformer(nn.Module):
-    """Temporal transformer module.
+class TemporalTransformer3DModel(nn.Module):
+    """Temporal transformer matching AnimateDiff checkpoint structure.
 
-    Matches AnimateDiff checkpoint structure:
-    - norm: input layer norm
-    - proj_in: input projection
-    - transformer_blocks: list of transformer blocks
-    - proj_out: output projection
+    Structure:
+    - norm: GroupNorm
+    - proj_in: Linear
+    - transformer_blocks: ModuleList of TemporalTransformerBlock
+    - proj_out: Linear
     """
 
     def __init__(
         self,
         in_channels: int,
-        num_heads: int = 8,
+        num_attention_heads: int = 8,
+        attention_head_dim: int = 64,
         num_layers: int = 1,
+        num_attention_blocks: int = 1,
+        temporal_max_len: int = 32,
         dropout: float = 0.0,
         ff_mult: float = 4.0,
+        norm_num_groups: int = 32,
     ):
         super().__init__()
 
         self.in_channels = in_channels
-        # AnimateDiff uses in_channels as the inner dimension
-        inner_dim = in_channels
-        dim_head = in_channels // num_heads
+        inner_dim = num_attention_heads * attention_head_dim
 
-        self.norm = nn.GroupNorm(32, in_channels, eps=1e-6, affine=True)
+        self.norm = nn.GroupNorm(norm_num_groups, in_channels, eps=1e-6, affine=True)
         self.proj_in = nn.Linear(in_channels, inner_dim)
 
         self.transformer_blocks = nn.ModuleList([
             TemporalTransformerBlock(
                 dim=inner_dim,
-                num_heads=num_heads,
-                dim_head=dim_head,
+                num_attention_heads=num_attention_heads,
+                attention_head_dim=attention_head_dim,
+                num_attention_blocks=num_attention_blocks,
+                temporal_max_len=temporal_max_len,
                 dropout=dropout,
                 ff_mult=ff_mult,
             )
@@ -196,27 +267,32 @@ class TemporalTransformer(nn.Module):
         return x + residual
 
 
-class MotionModule(nn.Module):
+class VanillaTemporalModule(nn.Module):
     """Motion module containing a temporal transformer.
 
-    This wraps a TemporalTransformer and is inserted at specific
-    positions in the UNet.
+    This is the VanillaTemporalModule from AnimateDiff that wraps
+    the TemporalTransformer3DModel.
     """
 
     def __init__(
         self,
         in_channels: int,
-        num_heads: int = 8,
-        num_layers: int = 2,
+        num_attention_heads: int = 8,
+        attention_head_dim: int = 64,
+        num_transformer_block: int = 1,  # Default is 1 transformer block
+        temporal_max_len: int = 32,
         dropout: float = 0.0,
     ):
         super().__init__()
 
         self.in_channels = in_channels
-        self.temporal_transformer = TemporalTransformer(
+        self.temporal_transformer = TemporalTransformer3DModel(
             in_channels=in_channels,
-            num_heads=num_heads,
-            num_layers=num_layers,
+            num_attention_heads=num_attention_heads,
+            attention_head_dim=attention_head_dim,
+            num_layers=num_transformer_block,
+            num_attention_blocks=2,  # ("Temporal_Self", "Temporal_Self") = 2 attention blocks
+            temporal_max_len=temporal_max_len,
             dropout=dropout,
         )
 
@@ -225,15 +301,14 @@ class MotionModule(nn.Module):
 
 
 class AnimateDiffModel(nn.Module):
-    """AnimateDiff model matching the official checkpoint structure.
+    """AnimateDiff model matching official checkpoint structure.
 
     Structure:
-    - down_blocks.{0,1,2,3}.motion_modules.{0,1}
-    - mid_block.motion_modules.0
+    - down_blocks.{0,1,2,3}.motion_modules.{0,1,2}
+    - mid_block.motion_modules.0 (optional, some checkpoints don't have this)
     - up_blocks.{0,1,2,3}.motion_modules.{0,1,2}
     """
 
-    # SD1.5 UNet block channel dimensions
     BLOCK_CHANNELS = {
         "down_blocks.0": 320,
         "down_blocks.1": 640,
@@ -246,12 +321,13 @@ class AnimateDiffModel(nn.Module):
         "up_blocks.3": 320,
     }
 
-    # Number of motion modules per block
+    # Number of VanillaTemporalModule instances per block
+    # down_blocks: 2 each, up_blocks: 3 each, mid_block: 1
     MODULES_PER_BLOCK = {
         "down_blocks.0": 2,
         "down_blocks.1": 2,
         "down_blocks.2": 2,
-        "down_blocks.3": 1,  # No downsampling in last block
+        "down_blocks.3": 2,
         "mid_block": 1,
         "up_blocks.0": 3,
         "up_blocks.1": 3,
@@ -261,8 +337,9 @@ class AnimateDiffModel(nn.Module):
 
     def __init__(
         self,
-        num_heads: int = 8,
-        num_layers: int = 2,
+        num_attention_heads: int = 8,
+        num_transformer_block: int = 1,  # Default is 1 transformer block per motion module
+        temporal_max_len: int = 32,
         dropout: float = 0.0,
     ):
         super().__init__()
@@ -272,7 +349,6 @@ class AnimateDiffModel(nn.Module):
         # Create block structure matching checkpoint
         self.down_blocks = nn.ModuleList()
         self.up_blocks = nn.ModuleList()
-        self.mid_block = None
 
         # Down blocks
         for i in range(4):
@@ -282,15 +358,29 @@ class AnimateDiffModel(nn.Module):
 
             block = nn.Module()
             block.motion_modules = nn.ModuleList([
-                MotionModule(channels, num_heads, num_layers, dropout)
+                VanillaTemporalModule(
+                    in_channels=channels,
+                    num_attention_heads=num_attention_heads,
+                    attention_head_dim=channels // num_attention_heads,
+                    num_transformer_block=num_transformer_block,
+                    temporal_max_len=temporal_max_len,
+                    dropout=dropout,
+                )
                 for _ in range(num_modules)
             ])
             self.down_blocks.append(block)
 
-        # Mid block
+        # Mid block (optional - some checkpoints don't have it)
         self.mid_block = nn.Module()
         self.mid_block.motion_modules = nn.ModuleList([
-            MotionModule(1280, num_heads, num_layers, dropout)
+            VanillaTemporalModule(
+                in_channels=1280,
+                num_attention_heads=num_attention_heads,
+                attention_head_dim=1280 // num_attention_heads,
+                num_transformer_block=num_transformer_block,
+                temporal_max_len=temporal_max_len,
+                dropout=dropout,
+            )
         ])
 
         # Up blocks
@@ -301,7 +391,14 @@ class AnimateDiffModel(nn.Module):
 
             block = nn.Module()
             block.motion_modules = nn.ModuleList([
-                MotionModule(channels, num_heads, num_layers, dropout)
+                VanillaTemporalModule(
+                    in_channels=channels,
+                    num_attention_heads=num_attention_heads,
+                    attention_head_dim=channels // num_attention_heads,
+                    num_transformer_block=num_transformer_block,
+                    temporal_max_len=temporal_max_len,
+                    dropout=dropout,
+                )
                 for _ in range(num_modules)
             ])
             self.up_blocks.append(block)
@@ -310,11 +407,8 @@ class AnimateDiffModel(nn.Module):
         """Set the number of frames for video generation."""
         self.num_frames = num_frames
 
-    def get_motion_module_by_channels(self, channels: int) -> Optional[MotionModule]:
-        """Get a motion module that matches the given channel dimension.
-
-        Returns the first motion module with matching channels.
-        """
+    def get_motion_module_by_channels(self, channels: int) -> Optional[VanillaTemporalModule]:
+        """Get a motion module that matches the given channel dimension."""
         # Check down blocks
         for block in self.down_blocks:
             for mm in block.motion_modules:
@@ -322,9 +416,10 @@ class AnimateDiffModel(nn.Module):
                     return mm
 
         # Check mid block
-        for mm in self.mid_block.motion_modules:
-            if mm.in_channels == channels:
-                return mm
+        if hasattr(self.mid_block, 'motion_modules'):
+            for mm in self.mid_block.motion_modules:
+                if mm.in_channels == channels:
+                    return mm
 
         # Check up blocks
         for block in self.up_blocks:
@@ -358,6 +453,14 @@ class AnimateDiffModel(nn.Module):
 
         print(f"[AnimateDiff] Checkpoint has {len(state_dict)} keys")
 
+        # Debug: show some checkpoint keys
+        sample_keys = list(state_dict.keys())[:5]
+        print(f"[AnimateDiff] Sample checkpoint keys: {sample_keys}")
+
+        # Debug: show model keys
+        model_keys = list(model.state_dict().keys())[:5]
+        print(f"[AnimateDiff] Sample model keys: {model_keys}")
+
         # Load weights
         try:
             missing, unexpected = model.load_state_dict(state_dict, strict=False)
@@ -365,16 +468,20 @@ class AnimateDiffModel(nn.Module):
             print(f"[AnimateDiff] Loaded {loaded}/{len(state_dict)} keys from checkpoint")
             if missing:
                 print(f"[AnimateDiff] Missing keys: {len(missing)}")
+                print(f"[AnimateDiff] Sample missing: {missing[:3]}")
             if unexpected:
                 print(f"[AnimateDiff] Unexpected keys: {len(unexpected)}")
+                print(f"[AnimateDiff] Sample unexpected: {unexpected[:3]}")
         except Exception as e:
             print(f"[AnimateDiff] Error loading checkpoint: {e}")
+            import traceback
+            traceback.print_exc()
 
         return model
 
 
 def get_motion_module_list() -> list:
-    """Get list of available motion modules from models/motion_modules directory."""
+    """Get list of available motion modules."""
     import os
     from modules import paths
 
